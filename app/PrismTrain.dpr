@@ -1,6 +1,6 @@
 program PrismTrain;
 
-{ Prism Trainings-CLI.
+{ Prism training CLI.
 
   Workflow:
     1. PrismTrain tokenizer --corpus data\corpus.txt --vocab 512 --out model\tokenizer.json
@@ -80,7 +80,7 @@ begin
   OutPath := ArgValue('out', 'tokenizer.json');
   Tok := TTokenizer.Create;
   try
-    Say(Format('Trainiere Byte-BPE (Zielvokabular %d) ...',
+    Say(Format('Training byte BPE (target vocabulary %d) ...',
       [ArgInt('vocab', 512)]));
     Tok.TrainFromData(Data, ArgInt('vocab', 512),
       ArgInt('max-bytes', 8 * 1024 * 1024), procedure(S: string)
@@ -88,7 +88,7 @@ begin
         Say('  ' + S);
       end);
     Tok.SaveToFile(OutPath);
-    Say(Format('Tokenizer gespeichert: %s (Vokabular %d)',
+    Say(Format('Tokenizer saved: %s (vocabulary %d)',
       [OutPath, Tok.VocabSize]));
   finally
     Tok.Free;
@@ -106,11 +106,11 @@ begin
   try
     Tok.LoadFromFile(ArgValue('tokenizer', 'tokenizer.json'));
     Data := TFile.ReadAllBytes(ArgValue('corpus', 'corpus.txt'));
-    Say(Format('Tokenisiere %d Bytes ...', [Length(Data)]));
+    Say(Format('Tokenizing %d bytes ...', [Length(Data)]));
     Tokens := Tok.EncodeData(Data);
     OutPath := ArgValue('out', 'corpus.tokens');
     SaveTokensFile(OutPath, Tokens);
-    Say(Format('%d Tokens -> %s (Kompression %.2fx)',
+    Say(Format('%d tokens -> %s (compression %.2fx)',
       [Length(Tokens), OutPath, Length(Data) / Length(Tokens)]));
   finally
     Tok.Free;
@@ -138,7 +138,7 @@ begin
   Cfg.NumExperts := ArgInt('experts', 1);
   if Cfg.Dim mod Cfg.NumHeads <> 0 then
   begin
-    Say('FEHLER: dim muss durch heads teilbar sein.');
+    Say('ERROR: dim must be divisible by heads.');
     Halt(1);
   end;
   W := TFullWeights.Create;
@@ -146,12 +146,12 @@ begin
     W.InitRandom(Cfg, UInt64(ArgInt('seed', 1337)));
     OutPath := ArgValue('out', 'model.prism');
     W.SaveToFile(OutPath);
-    Say('Modell initialisiert: ' + OutPath);
+    Say('Model initialized: ' + OutPath);
     Say('  ' + Cfg.ToString);
-    Say(Format('  Parameter: %.2f M (%.1f MB als F32)',
+    Say(Format('  Parameters: %.2f M (%.1f MB as F32)',
       [W.Layout.TotalCount / 1e6, W.Layout.TotalCount * 4 / 1024 / 1024]));
     if Cfg.IsMoE then
-      Say(Format('  MoE aktiv: %d Experten/Layer, pro Token 1 aktiv',
+      Say(Format('  MoE active: %d experts/layer, 1 active per token',
         [Cfg.NumExperts]));
   finally
     W.Free;
@@ -174,9 +174,9 @@ begin
   W := TFullWeights.Create;
   try
     W.LoadFromFile(ModelPath);
-    Say('Modell geladen: ' + W.Config.ToString);
+    Say('Model loaded: ' + W.Config.ToString);
     Tokens := LoadTokensFile(ArgValue('tokens', 'corpus.tokens'));
-    Say(Format('Trainingsdaten: %d Tokens', [Length(Tokens)]));
+    Say(Format('Training data: %d tokens', [Length(Tokens)]));
     Trainer := TTrainer.Create(W, ArgInt('batch', 4), ArgInt('seq', 128));
     try
       Steps := ArgInt('steps', 500);
@@ -194,17 +194,17 @@ begin
         else
           AvgLoss := 0.95 * AvgLoss + 0.05 * Loss;
         if (S mod 10 = 0) or (S = 1) then
-          Say(Format('Schritt %5d/%d  Loss %.4f  (Mittel %.4f)  %.1f ms/Schritt',
+          Say(Format('Step %5d/%d  loss %.4f  (avg %.4f)  %.1f ms/step',
             [S, Steps, Loss, AvgLoss,
              Watch.ElapsedMilliseconds / S]));
         if (SaveEvery > 0) and (S mod SaveEvery = 0) then
         begin
           W.SaveToFile(ModelPath);
-          Say('  Checkpoint gespeichert.');
+          Say('  Checkpoint saved.');
         end;
       end;
       W.SaveToFile(ModelPath);
-      Say('Training abgeschlossen, Modell gespeichert: ' + ModelPath);
+      Say('Training finished, model saved: ' + ModelPath);
     finally
       Trainer.Free;
     end;
@@ -237,7 +237,7 @@ begin
     if HasArg('chat') then
     begin
       SetLength(Msgs, 1);
-      Msgs[0] := TChatMessage.Make('user', ArgValue('prompt', 'Hallo!'));
+      Msgs[0] := TChatMessage.Make('user', ArgValue('prompt', 'Hello!'));
       Tokens := Tok.BuildChatTokens(Msgs, ctPrism);
     end
     else
@@ -250,13 +250,13 @@ begin
           Write(Chunk);
         end, Usage);
       Writeln;
-      Say(Format('[%d Prompt- + %d Antwort-Tokens]',
+      Say(Format('[%d prompt + %d completion tokens]',
         [Usage.PromptTokens, Usage.CompletionTokens]));
     finally
       Gen.Free;
     end;
   finally
-    BE.Free; // gibt W und Tok frei
+    BE.Free; // frees W and Tok
   end;
 end;
 
@@ -278,8 +278,8 @@ begin
       CmdSample
     else
     begin
-      Say('Prism ' + PRISM_VERSION + ' - Trainings-CLI');
-      Say('Befehle:');
+      Say('Prism ' + PRISM_VERSION + ' - training CLI');
+      Say('Commands:');
       Say('  tokenizer --corpus F --vocab N --out tokenizer.json');
       Say('  tokenize  --corpus F --tokenizer T --out corpus.tokens');
       Say('  init      --tokenizer T --dim N --layers N --heads N --seq N --experts N --out model.prism');
@@ -289,7 +289,7 @@ begin
   except
     on E: Exception do
     begin
-      Writeln('FEHLER: ', E.Message);
+      Writeln('ERROR: ', E.Message);
       Halt(1);
     end;
   end;

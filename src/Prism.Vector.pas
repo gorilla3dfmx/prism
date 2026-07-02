@@ -1,19 +1,19 @@
 unit Prism.Vector;
 
-{ Optimierte Vektor-/Matrix-Kernels (CPU), Pointer-basiert.
+{ Optimized vector/matrix kernels (CPU), pointer-based.
 
-  Design-Entscheidungen fuer Performance:
-  - PSingle-Pointerarithmetik statt Array-Indizierung (keine Range-Checks,
-    besseres Register-Scheduling durch den Compiler)
-  - 4-fach entrollte Skalarprodukte mit Double-Akkumulatoren
-  - Zeilen-parallele MatVec ueber TParallel.For (System.Threading)
-  - Quantisierte Fused-Kernels (Q8_0/Q4_0/Q4_1): die Aktivierung wird EINMAL
-    pro Aufruf nach int8 quantisiert, danach reine Integer-MACs pro Block.
-    Dadurch koennen GGUF-Modelle mit Milliarden Parametern direkt im
-    quantisierten Format gerechnet werden (kein F32-Blowup im RAM).
-  - F16->F32 ueber 64K-Lookup-Tabelle (256 KB, einmalig aufgebaut)
+  Design decisions for performance:
+  - PSingle pointer arithmetic instead of array indexing (no range checks,
+    better register scheduling by the compiler)
+  - 4-way unrolled dot products with double accumulators
+  - Row-parallel MatVec via TParallel.For (System.Threading)
+  - Quantized fused kernels (Q8_0/Q4_0/Q4_1): the activation is quantized
+    to int8 ONCE per call, then pure integer MACs per block. This allows
+    GGUF models with billions of parameters to be computed directly in
+    the quantized format (no F32 blowup in RAM).
+  - F16->F32 via 64K lookup table (256 KB, built once)
 
-  Alle Byte-/Element-Offsets sind Int64-faehig (grosse Modelle). }
+  All byte/element offsets are Int64-capable (large models). }
 
 {$POINTERMATH ON}
 
@@ -23,14 +23,14 @@ uses
   System.SysUtils, System.Math, System.Threading;
 
 const
-  QK = 32; // Blockgroesse aller unterstuetzten GGML-Quantisierungen
+  QK = 32; // block size of all supported GGML quantizations
 
 type
-  { GGML-Tensortypen (Teilmenge), Werte = GGUF/GGML-Enum }
+  { GGML tensor types (subset), values = GGUF/GGML enum }
   TGgmlType = (gtF32 = 0, gtF16 = 1, gtQ4_0 = 2, gtQ4_1 = 3, gtQ8_0 = 8);
 
-  { Quantisierter (oder F32/F16) 2D-Tensor, zeilenweise gespeichert.
-    Rows/Cols einzeln < 2^31, Gesamtgroesse Int64. }
+  { Quantized (or F32/F16) 2D tensor, stored row by row.
+    Rows/Cols individually < 2^31, total size Int64. }
   TQTensor = record
     Typ: TGgmlType;
     Rows, Cols: Integer;
@@ -39,15 +39,15 @@ type
     function RowBytes: Int64;
     function TotalBytes: Int64;
     function IsEmpty: Boolean;
-    { y[0..Rows) = W * x[0..Cols) - Fused-Kernel, parallelisiert }
+    { y[0..Rows) = W * x[0..Cols) - fused kernel, parallelized }
     procedure MatVec(Y, X: PSingle);
-    { Eine Zeile nach F32 dequantisieren (z.B. Embedding-Lookup) }
+    { Dequantize one row to F32 (e.g. embedding lookup) }
     procedure DequantRow(Row: Integer; Dst: PSingle);
   end;
 
 function HalfToFloat(H: Word): Single;
 
-{ F32-Basiskernels }
+{ F32 base kernels }
 function DotF32(A, B: PSingle; N: Integer): Single;
 procedure MatVecF32(Y, W, X: PSingle; Rows, Cols: Integer; Bias: PSingle);
 procedure AddVec(A, B: PSingle; N: Integer);
@@ -62,7 +62,7 @@ procedure SiluVec(X: PSingle; N: Integer);
 procedure GeluVec(X: PSingle; N: Integer);
 function ArgMax(X: PSingle; N: Integer): Integer;
 
-{ Parallelitaets-Schwelle: unterhalb lohnt kein Thread-Fanout }
+{ Parallelism threshold: below this, thread fan-out does not pay off }
 const
   PAR_MIN_WORK = 64 * 1024;
 
@@ -114,7 +114,7 @@ begin
     GHalf[I] := HalfToFloatCompute(Word(I));
 end;
 
-{ ---------- F32-Kernels ---------- }
+{ ---------- F32 kernels ---------- }
 
 function DotF32(A, B: PSingle; N: Integer): Single;
 var
@@ -293,10 +293,10 @@ begin
       Result := I;
 end;
 
-{ ---------- Quantisierung ---------- }
+{ ---------- Quantization ---------- }
 
-{ Aktivierung x nach int8 quantisieren: pro 32er-Block ein Skalenfaktor.
-  XQ: N int8-Werte, XS: N/32 Skalen, XSum: N/32 Blocksummen von x (fuer Q4). }
+{ Quantize activation x to int8: one scale factor per 32-element block.
+  XQ: N int8 values, XS: N/32 scales, XSum: N/32 block sums of x (for Q4). }
 procedure QuantizeActivation(X: PSingle; N: Integer; XQ: PShortInt;
   XS, XSum: PSingle);
 var
@@ -328,7 +328,7 @@ begin
   end;
 end;
 
-{ Q8_0-Block: 2 Byte F16-Skala + 32 int8  (34 Bytes / 32 Werte) }
+{ Q8_0 block: 2-byte F16 scale + 32 int8  (34 bytes / 32 values) }
 function DotRowQ8_0(Row: PByte; XQ: PShortInt; XS: PSingle; NB: Integer): Single;
 var
   B, I, SumI: Integer;
@@ -352,8 +352,8 @@ begin
   Result := Acc;
 end;
 
-{ Q4_0-Block: 2 Byte F16-Skala + 16 Byte Nibbles (18 Bytes / 32 Werte)
-  Wert i (0..15) = low nibble - 8, Wert i+16 = high nibble - 8 }
+{ Q4_0 block: 2-byte F16 scale + 16 bytes of nibbles (18 bytes / 32 values)
+  value i (0..15) = low nibble - 8, value i+16 = high nibble - 8 }
 function DotRowQ4_0(Row: PByte; XQ: PShortInt; XS: PSingle; NB: Integer): Single;
 var
   B, I, SumI, SumX: Integer;
@@ -384,8 +384,8 @@ begin
   Result := Acc;
 end;
 
-{ Q4_1-Block: F16 d + F16 m + 16 Byte Nibbles (20 Bytes / 32 Werte)
-  Wert = q*d + m  ->  dot += d*sum(q*x) + m*sum(x)  (sum(x) in F32) }
+{ Q4_1 block: F16 d + F16 m + 16 bytes of nibbles (20 bytes / 32 values)
+  value = q*d + m  ->  dot += d*sum(q*x) + m*sum(x)  (sum(x) in F32) }
 function DotRowQ4_1(Row: PByte; XQ: PShortInt; XS, XSum: PSingle;
   NB: Integer): Single;
 var
@@ -435,7 +435,7 @@ begin
     gtQ4_1: Result := Int64(ACols div QK) * 20;
     gtQ8_0: Result := Int64(ACols div QK) * 34;
   else
-    raise Exception.Create('TQTensor: nicht unterstuetzter GGML-Typ');
+    raise Exception.Create('TQTensor: unsupported GGML type');
   end;
 end;
 

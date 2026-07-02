@@ -1,125 +1,125 @@
-# Prism — LLM-Framework in reinem Delphi (Object Pascal)
+# Prism — LLM Framework in Pure Delphi (Object Pascal)
 
-Prism ist ein komplett in **Delphi 13** implementiertes LLM-Framework — **ohne Third-Party-Libraries**, nur mit den in Delphi enthaltenen Units (RTL, Indy, FMX). Es läuft auf **Windows, Linux, macOS, Android und iOS** und ist für den lokalen Betrieb auf mobilen Geräten ausgelegt.
+Prism is an LLM framework implemented entirely in **Delphi 13** — **without third-party libraries**, using only the units that ship with Delphi (RTL, Indy, FMX). It runs on **Windows, Linux, macOS, Android, and iOS** and is designed for local operation on mobile devices.
 
-## Was Prism kann
+## What Prism can do
 
 | Feature | Status |
 |---|---|
-| Eigene GPT-artige Transformer-Modelle **trainieren** (voller Backprop, AdamW) | ✅ |
-| **Existierende trainierte LLMs laden**: GGUF-Binärformat (llama.cpp-Ökosystem) | ✅ |
-| Llama-Architektur-Inferenz: RMSNorm, RoPE, GQA, SwiGLU | ✅ |
-| Quantisierte Inferenz: Q8_0, Q4_0, Q4_1, F16, F32 (Fused-Integer-Kernels) | ✅ |
-| **Clustering / Layer-Streaming**: Modell muss nicht komplett in den RAM | ✅ |
-| **Mixture-of-Experts** („thematische Areale", Top-1-Routing) inkl. Training | ✅ |
-| **Selbst-Verifikation** der Antworten (Perplexität, Selbstkonsistenz, Critic) | ✅ |
-| REST-API kompatibel zu **OpenAI** und **Ollama** (inkl. Streaming) | ✅ |
-| **Multimodales Training** über Byte-Level-Tokenisierung (Text, Bild, Audio, Video, 3D, Binär) | ✅ |
-| Online-Finetuning über REST (`POST /api/train`) | ✅ |
-| GPU-Backend über OpenCL (dynamisch geladen, kein SDK nötig) | ⚠️ experimentell |
-| Milliarden-Parameter-Modelle | ✅ über GGUF + Quantisierung + Streaming (64-Bit-Targets) |
+| **Train** your own GPT-style transformer models (full backprop, AdamW) | ✅ |
+| **Load existing trained LLMs**: GGUF binary format (llama.cpp ecosystem) | ✅ |
+| Llama-architecture inference: RMSNorm, RoPE, GQA, SwiGLU | ✅ |
+| Quantized inference: Q8_0, Q4_0, Q4_1, F16, F32 (fused integer kernels) | ✅ |
+| **Clustering / layer streaming**: the model does not have to fit entirely in RAM | ✅ |
+| **Mixture-of-Experts** ("thematic areas", top-1 routing) incl. training | ✅ |
+| **Self-verification** of answers (perplexity, self-consistency, critic) | ✅ |
+| REST API compatible with **OpenAI** and **Ollama** (incl. streaming) | ✅ |
+| **Multimodal training** via byte-level tokenization (text, image, audio, video, 3D, binary) | ✅ |
+| Online fine-tuning via REST (`POST /api/train`) | ✅ |
+| GPU backend via OpenCL (dynamically loaded, no SDK required) | ⚠️ experimental |
+| Billion-parameter models | ✅ via GGUF + quantization + streaming (64-bit targets) |
 
-**Realistische Erwartung:** Selbst trainierte Prism-Modelle sind *kleine* Modelle (Millionen Parameter) — sinnvoll für domänenspezifische Assistenten, Autocomplete, Klassifikation und zum Lernen/Experimentieren. Für „echte" Konversationsqualität lädt man ein fertig trainiertes GGUF-Modell (z. B. TinyLlama 1.1B, Qwen2 1.5B, Mistral 7B) — das läuft dank quantisierter Kernels und Layer-Streaming auch auf Geräten mit wenig RAM, CPU-bedingt aber langsamer als llama.cpp.
+**Realistic expectation:** Prism models you train yourself are *small* models (millions of parameters) — useful for domain-specific assistants, autocomplete, classification, and for learning/experimenting. For "real" conversational quality, load a pre-trained GGUF model (e.g. TinyLlama 1.1B, Qwen2 1.5B, Mistral 7B) — thanks to quantized kernels and layer streaming this also runs on devices with little RAM, though CPU-bound and therefore slower than llama.cpp.
 
 ---
 
-## Verzeichnisstruktur
+## Directory structure
 
 ```
-E:\delphi\projects\llm\
+E:\delphi\projects\prism\
 ├── README.md
-├── src\                        Framework (alle Units ohne Fremdabhängigkeiten)
-│   ├── Prism.Types.pas         Basistypen, Config, Parameter-Layout (Int64), RNG
-│   ├── Prism.Vector.pas        Pointer-basierte Vektor-Kernels, Quantisierung (Q4/Q8/F16)
-│   ├── Prism.Tensor.pas        Trainings-Kernels: Forward + Backward (llm.c-Port)
-│   ├── Prism.Tokenizer.pas     Eigener Byte-Level-BPE-Tokenizer (multimodal-fähig)
-│   ├── Prism.Model.pas         .prism-Checkpoint-Format, Gewichts-Provider
-│   ├── Prism.Streaming.pas     Layer-/Experten-Cluster-Streaming (LRU) für .prism
-│   ├── Prism.Gguf.pas          GGUF-Reader + SPM/GPT2-Tokenizer aus Metadaten
-│   ├── Prism.Llama.pas         Llama-Architektur-Engine (GGUF), Layer-Streaming
-│   ├── Prism.Inference.pas     Eigene Engine (inkl. MoE), Generator, Sampling
-│   ├── Prism.Train.pas         Trainer (AdamW, MoE-Backprop), Online-Training
-│   ├── Prism.Verify.pas        Selbst-Verifikation
-│   ├── Prism.Multimodal.pas    Multimodale Korpus-Pipeline
-│   ├── Prism.Gpu.pas           OpenCL-Backend (dynamisch geladen)
-│   └── Prism.RestServer.pas    REST-API (Indy), OpenAI + Ollama kompatibel
+├── src\                        Framework (all units without external dependencies)
+│   ├── Prism.Types.pas         Base types, config, parameter layout (Int64), RNG
+│   ├── Prism.Vector.pas        Pointer-based vector kernels, quantization (Q4/Q8/F16)
+│   ├── Prism.Tensor.pas        Training kernels: forward + backward (llm.c port)
+│   ├── Prism.Tokenizer.pas     Custom byte-level BPE tokenizer (multimodal-capable)
+│   ├── Prism.Model.pas         .prism checkpoint format, weight provider
+│   ├── Prism.Streaming.pas     Layer/expert cluster streaming (LRU) for .prism
+│   ├── Prism.Gguf.pas          GGUF reader + SPM/GPT2 tokenizer from metadata
+│   ├── Prism.Llama.pas         Llama-architecture engine (GGUF), layer streaming
+│   ├── Prism.Inference.pas     Custom engine (incl. MoE), generator, sampling
+│   ├── Prism.Train.pas         Trainer (AdamW, MoE backprop), online training
+│   ├── Prism.Verify.pas        Self-verification
+│   ├── Prism.Multimodal.pas    Multimodal corpus pipeline
+│   ├── Prism.Gpu.pas           OpenCL backend (dynamically loaded)
+│   └── Prism.RestServer.pas    REST API (Indy), OpenAI + Ollama compatible
 ├── app\
-│   ├── PrismTrain.dpr          Trainings-CLI (Konsole)
-│   ├── PrismServer.dpr         Server-CLI (Konsole)
+│   ├── PrismTrain.dpr          Training CLI (console)
+│   ├── PrismServer.dpr         Server CLI (console)
 │   └── mobile\
-│       ├── PrismMobile.dpr     FMX-App (Android/iOS/Desktop)
+│       ├── PrismMobile.dpr     FMX app (Android/iOS/desktop)
 │       ├── MainFormU.pas/.fmx
-├── data\sample_corpus.txt      Beispiel-Trainingskorpus (deutsch)
-└── model\                      Ablage für Modelle/Tokenizer
+├── data\sample_corpus.txt      Sample training corpus (German)
+└── model\                      Storage for models/tokenizers
 ```
 
-## Kompilieren
+## Compiling
 
-Alle `.dpr`-Dateien referenzieren ihre Units mit relativen Pfaden — einfach in der IDE öffnen:
+All `.dpr` files reference their units via relative paths — just open them in the IDE:
 
-1. **RAD Studio / Delphi 13** starten → `app\PrismTrain.dpr` bzw. `app\PrismServer.dpr` öffnen (Delphi erzeugt die `.dproj` automatisch) → Ziel **Win64** wählen → kompilieren.
-2. **Release-Konfiguration verwenden!** Der Optimierungsunterschied ist bei den Rechenkernels enorm.
-3. Mobile: `app\mobile\PrismMobile.dpr` öffnen, Zielplattform *Android 64-Bit* oder *iOS* hinzufügen, unter *Projekt → Deployment* die Modelldateien ins Dokumente-Verzeichnis deployen. Android braucht die Berechtigung **INTERNET**.
+1. Start **RAD Studio / Delphi 13** → open `app\PrismTrain.dpr` or `app\PrismServer.dpr` (Delphi generates the `.dproj` automatically) → select **Win64** as target → compile.
+2. **Use the Release configuration!** The optimization difference is enormous for the compute kernels.
+3. Mobile: open `app\mobile\PrismMobile.dpr`, add *Android 64-bit* or *iOS* as target platform, deploy the model files to the documents directory under *Project → Deployment*. Android requires the **INTERNET** permission.
 
-Kommandozeile (Beispiel):
+Command line (example):
 
 ```bat
 "C:\Program Files (x86)\Embarcadero\Studio\37.0\bin\dcc64.exe" -B -$O+ -U..\src app\PrismServer.dpr
 ```
 
-> **Wichtig für große Modelle:** Immer 64-Bit-Targets bauen. Alle Offsets/Größen im Code sind `Int64` — Dateien > 4 GB und Milliarden Parameter sind adressierbar, aber nur 64-Bit-Prozesse können sie mappen.
+> **Important for large models:** Always build 64-bit targets. All offsets/sizes in the code are `Int64` — files > 4 GB and billions of parameters are addressable, but only 64-bit processes can map them.
 
 ---
 
-## Schnellstart A: Existierendes LLM laden (GGUF)
+## Quick start A: Load an existing LLM (GGUF)
 
-Ein fertig trainiertes Modell im GGUF-Format besorgen (z. B. von Hugging Face: `tinyllama-1.1b-chat-v1.0.Q8_0.gguf`) und starten:
+Get a pre-trained model in GGUF format (e.g. from Hugging Face: `tinyllama-1.1b-chat-v1.0.Q8_0.gguf`) and start:
 
 ```bat
 PrismServer --model models\tinyllama-1.1b-chat.Q8_0.gguf --ctx 1024
 ```
 
-Bei wenig RAM (z. B. mobil) Layer-Streaming aktivieren — es liegen dann nur N Transformer-Layer gleichzeitig im Speicher:
+With limited RAM (e.g. on mobile), enable layer streaming — only N transformer layers are then kept in memory at a time:
 
 ```bat
 PrismServer --model models\mistral-7b.Q4_0.gguf --ctx 512 --stream-layers 6
 ```
 
-Unterstützt: GGUF v2/v3, Tensor-Typen **F32, F16, Q4_0, Q4_1, Q8_0** (andere bitte mit `llama-quantize` umwandeln), Architekturen der Llama-Familie (llama, mistral, qwen2, …), Tokenizer `llama` (SentencePiece) und `gpt2` (Byte-BPE).
+Supported: GGUF v2/v3, tensor types **F32, F16, Q4_0, Q4_1, Q8_0** (please convert others with `llama-quantize`), architectures of the Llama family (llama, mistral, qwen2, …), tokenizers `llama` (SentencePiece) and `gpt2` (byte BPE).
 
-## Schnellstart B: Eigenes Modell trainieren
+## Quick start B: Train your own model
 
 ```bat
-cd E:\delphi\projects\llm
+cd E:\delphi\projects\prism
 
-:: 1. Tokenizer auf dem Korpus lernen (Byte-BPE)
+:: 1. Learn the tokenizer on the corpus (byte BPE)
 PrismTrain tokenizer --corpus data\sample_corpus.txt --vocab 512 --out model\tokenizer.json
 
-:: 2. Korpus tokenisieren
+:: 2. Tokenize the corpus
 PrismTrain tokenize --corpus data\sample_corpus.txt --tokenizer model\tokenizer.json --out model\corpus.tokens
 
-:: 3. Modell initialisieren (hier: ~3M Parameter; --experts 4 für MoE)
+:: 3. Initialize the model (here: ~3M parameters; --experts 4 for MoE)
 PrismTrain init --tokenizer model\tokenizer.json --dim 192 --layers 6 --heads 6 --seq 256 --experts 1 --out model\model.prism
 
-:: 4. Trainieren (Loss sollte deutlich unter den Startwert ~ln(Vokabular) fallen)
+:: 4. Train (loss should drop well below the starting value ~ln(vocabulary))
 PrismTrain train --model model\model.prism --tokens model\corpus.tokens --steps 3000 --batch 4 --seq 128 --lr 0.0003
 
-:: 5. Testen
+:: 5. Test
 PrismTrain sample --model model\model.prism --tokenizer model\tokenizer.json --chat --prompt "Wer bist du?"
 
-:: 6. Als Server bereitstellen (mit Selbst-Verifikation und Online-Training)
+:: 6. Serve it (with self-verification and online training)
 PrismServer --model model\model.prism --tokenizer model\tokenizer.json --verify --train
 ```
 
-Der Beispiel-Korpus ist bewusst winzig; fürs Lernen reicht er (das Modell memoriert die Muster). Für brauchbare Ergebnisse: eigenen Korpus im gleichen Format aufbauen (`<|user|>Frage<|assistant|>Antwort<|eos|>` pro Zeile, plus Fließtext).
+The sample corpus is deliberately tiny; it is sufficient for learning (the model memorizes the patterns). For usable results: build your own corpus in the same format (`<|user|>Question<|assistant|>Answer<|eos|>` per line, plus running text).
 
 ---
 
-## REST-API
+## REST API
 
-Der Server ist ein Drop-in-Ersatz für OpenAI-/Ollama-Endpunkte — bestehende Clients (SDKs, UIs) funktionieren ohne Anpassung.
+The server is a drop-in replacement for OpenAI/Ollama endpoints — existing clients (SDKs, UIs) work without modification.
 
-### OpenAI-kompatibel
+### OpenAI-compatible
 
 ```bash
 curl http://localhost:11434/v1/chat/completions -d '{
@@ -132,7 +132,7 @@ curl http://localhost:11434/v1/chat/completions -d '{
 }'
 ```
 
-Antwort enthält bei `"verify": true` zusätzlich:
+With `"verify": true`, the response additionally contains:
 
 ```json
 "x_verification": {
@@ -143,9 +143,9 @@ Antwort enthält bei `"verify": true` zusätzlich:
 }
 ```
 
-`stream: true` liefert Server-Sent Events (`data: {...}`, abgeschlossen mit `data: [DONE]`).
+`stream: true` delivers server-sent events (`data: {...}`, terminated with `data: [DONE]`).
 
-### Ollama-kompatibel
+### Ollama-compatible
 
 ```bash
 curl http://localhost:11434/api/chat     -d '{"model":"prism","messages":[{"role":"user","content":"Hallo"}]}'
@@ -153,66 +153,66 @@ curl http://localhost:11434/api/generate -d '{"model":"prism","prompt":"Es war e
 curl http://localhost:11434/api/tags
 ```
 
-(Streaming per NDJSON, wie bei Ollama Standard.)
+(Streaming via NDJSON, as is standard for Ollama.)
 
-### Training über REST (`POST /api/train`)
+### Training via REST (`POST /api/train`)
 
-Jede Datenart kann eingespeist werden — Text direkt, alles andere Base64-kodiert mit Modalitäts-Angabe:
+Any kind of data can be fed in — text directly, everything else Base64-encoded with a modality tag:
 
 ```bash
-# Chat-Paar
+# Chat pair
 curl http://localhost:11434/api/train -d '{"user":"Was ist Prism?","assistant":"Ein LLM-Framework in Delphi."}'
 
-# Fließtext
+# Running text
 curl http://localhost:11434/api/train -d '{"text":"Delphi kompiliert nativ fuer fuenf Plattformen."}'
 
-# Multimodal: Bild/Audio/Video/3D/Binär + Beschreibung
+# Multimodal: image/audio/video/3D/binary + description
 curl http://localhost:11434/api/train -d '{"data":"<base64>","modality":"image","description":"Ein roter Wuerfel"}'
 ```
 
-Mit `--train` (nur `.prism`-Modelle im Full-Memory-Modus) finetuned ein Hintergrund-Thread sofort und speichert den Checkpoint; ohne `--train` wird das Sample im Korpus (`--corpus`) gesammelt und später offline mit `PrismTrain` trainiert.
+With `--train` (only `.prism` models in full-memory mode), a background thread fine-tunes immediately and saves the checkpoint; without `--train`, the sample is collected in the corpus (`--corpus`) and trained offline later with `PrismTrain`.
 
 ---
 
-## Konzepte
+## Concepts
 
-### Clustering / Speicher-Streaming
+### Clustering / memory streaming
 
-Statt das komplette Modell zu laden, hält Prism nur einen **Resident-Anteil** (Embeddings, finale Norm) dauerhaft im RAM. Transformer-Layer — und bei MoE einzelne **Experten** — werden als Cluster bedarfsweise von der Platte gelesen und in **LRU-Caches** gehalten (`--stream-layers N`, `--experts-cache N`). Kostet Latenz pro Cache-Miss (Platten-I/O), reduziert den Speicherbedarf aber von „Gesamtmodell" auf „N Layer + Resident". Funktioniert für `.prism` und `.gguf`.
+Instead of loading the entire model, Prism keeps only a **resident portion** (embeddings, final norm) permanently in RAM. Transformer layers — and with MoE, individual **experts** — are read from disk as clusters on demand and held in **LRU caches** (`--stream-layers N`, `--experts-cache N`). This costs latency per cache miss (disk I/O) but reduces the memory footprint from "entire model" to "N layers + resident". Works for `.prism` and `.gguf`.
 
-### „Thematische Areale" = Mixture-of-Experts
+### "Thematic areas" = Mixture-of-Experts
 
-`--experts N` beim `init` erzeugt pro Layer N FFN-Experten plus einen Router. Der Router wählt **pro Token genau einen Experten** (Top-1) — es wird also immer nur ein Untergraph gerechnet statt des ganzen Netzes, und beim Streaming müssen nur die tatsächlich angesprochenen Areale im Speicher liegen. Die Spezialisierung der Areale entsteht im Training von selbst (Router-Gradienten via Softmax-Backprop). Häufig genutzte Areale bleiben im LRU-Cache „warm" — genau die gewünschte Optimierung: Suche im Untergraph statt Volldurchlauf.
+`--experts N` at `init` creates N FFN experts per layer plus a router. The router selects **exactly one expert per token** (top-1) — so only a subgraph is ever computed instead of the whole network, and with streaming only the areas that are actually addressed need to be in memory. The specialization of the areas emerges on its own during training (router gradients via softmax backprop). Frequently used areas stay "warm" in the LRU cache — exactly the desired optimization: search in a subgraph instead of a full pass.
 
-### Selbst-Verifikation
+### Self-verification
 
-Drei unabhängige Signale pro Antwort: (1) **Perplexität** — wie sicher war das Modell bei der eigenen Antwort (Rescoring), (2) **Selbstkonsistenz** — Ähnlichkeit alternativer Samples zur Antwort, (3) **Critic-Pass** — das Modell bewertet seine Antwort selbst (P(„ja") vs. P(„nein")). Daraus wird `pass`/`warn`/`fail` abgeleitet; Schwellwerte in `TVerifier` konfigurierbar. Bei kleinen selbst trainierten Modellen ist der Critic naturgemäß schwach — Perplexität und Konsistenz tragen dann die Aussage.
+Three independent signals per answer: (1) **Perplexity** — how confident the model was in its own answer (rescoring), (2) **self-consistency** — similarity of alternative samples to the answer, (3) **critic pass** — the model rates its own answer (P("yes") vs. P("no")). From these, `pass`/`warn`/`fail` is derived; thresholds are configurable in `TVerifier`. With small self-trained models the critic is naturally weak — perplexity and consistency then carry the verdict.
 
-### Multimodalität (Byte-Level)
+### Multimodality (byte-level)
 
-Der Prism-Tokenizer arbeitet auf **Bytes** — damit ist jede Datenart tokenisierbar. Modalitäten werden durch Marker eingerahmt (`<|img|>…<|/img|>`, `<|aud|>`, `<|vid|>`, `<|3d|>`, `<|bin|>`), große Rohdaten werden per Stride-Sampling reduziert. Das ist der ehrliche, universelle Einstieg; gelernte Encoder (Patch-/Mel-Embeddings) sind der geplante nächste Schritt für ernsthafte Bild-/Audio-Qualität.
+The Prism tokenizer works on **bytes** — so any kind of data can be tokenized. Modalities are framed by markers (`<|img|>…<|/img|>`, `<|aud|>`, `<|vid|>`, `<|3d|>`, `<|bin|>`), and large raw data is reduced via stride sampling. This is the honest, universal entry point; learned encoders (patch/mel embeddings) are the planned next step for serious image/audio quality.
 
-### Effizienz der Inferenz
+### Inference efficiency
 
-- **KV-Cache** (rechnet nur gegen gecachte Keys/Values, nie den Prompt neu)
-- **Prefill ohne Logits**: beim Einlesen des Prompts entfällt die teure Vokabular-Projektion komplett
-- **Fused-Quant-Kernels**: Aktivierung wird einmal nach int8 quantisiert, dann reine Integer-MACs gegen Q4/Q8-Gewichte — kein F32-Aufblasen im RAM
-- Pointer-basierte, entrollte Skalarprodukte; zeilenparallele MatVec über alle CPU-Kerne
-- F16→F32 per Lookup-Tabelle
+- **KV cache** (computes only against cached keys/values, never re-processes the prompt)
+- **Prefill without logits**: while reading in the prompt, the expensive vocabulary projection is skipped entirely
+- **Fused quant kernels**: the activation is quantized to int8 once, then pure integer MACs against Q4/Q8 weights — no F32 inflation in RAM
+- Pointer-based, unrolled dot products; row-parallel MatVec across all CPU cores
+- F16→F32 via lookup table
 
 ### GPU
 
-`--gpu` versucht das System-OpenCL dynamisch zu laden (Windows `OpenCL.dll`, Linux/Android `libOpenCL.so`, macOS Framework) — keine Third-Party-Library, keine SDK-Installation. Beschleunigt derzeit die großen F32-MatVecs eigener Modelle; Gewichts-Buffer werden auf der GPU gecacht. Quantisierte GGUF-Kernels laufen noch auf der CPU. iOS hat kein OpenCL → automatischer CPU-Fallback (Metal-Backend: Roadmap).
+`--gpu` attempts to dynamically load the system OpenCL (Windows `OpenCL.dll`, Linux/Android `libOpenCL.so`, macOS framework) — no third-party library, no SDK installation. Currently accelerates the large F32 MatVecs of your own models; weight buffers are cached on the GPU. Quantized GGUF kernels still run on the CPU. iOS has no OpenCL → automatic CPU fallback (Metal backend: roadmap).
 
 ---
 
-## Grenzen & Roadmap
+## Limits & roadmap
 
-- **Kein Wunder erwarten:** Training auf einer CPU erreicht keine GPT-Qualität. Die Stärke ist der komplette, verständliche, überall kompilierbare Stack plus das Ausführen fertiger GGUF-Modelle.
-- Roadmap: Q4_K/Q5_K/Q6_K-Quantisierung, OpenCL-Kernels für Quant-MatVec, Metal-Backend (iOS/macOS), Batch-Prefill (Matmul statt Token-Schleife), gelernte multimodale Encoder, MoE-Load-Balancing-Loss, GGUF-Export eigener Modelle, Speculative Decoding.
-- GPT-2-BPE-Pretokenizer ist vereinfacht (kein volles Regex) — Tokenisierung kann in Randfällen minimal vom Original abweichen.
-- Der Server serialisiert Generierungen (ein Request rechnet exklusiv); parallele Sessions teilen sich die CPU ohnehin.
+- **Don't expect miracles:** Training on a CPU will not reach GPT quality. The strength is the complete, understandable, compile-anywhere stack plus running pre-trained GGUF models.
+- Roadmap: Q4_K/Q5_K/Q6_K quantization, OpenCL kernels for quant MatVec, Metal backend (iOS/macOS), batch prefill (matmul instead of token loop), learned multimodal encoders, MoE load-balancing loss, GGUF export of your own models, speculative decoding.
+- The GPT-2 BPE pretokenizer is simplified (no full regex) — tokenization can deviate minimally from the original in edge cases.
+- The server serializes generations (one request computes exclusively); parallel sessions would share the CPU anyway.
 
-## Lizenz / Herkunft
+## License / origin
 
-Eigenentwicklung in Object Pascal. Die Trainings-Mathematik folgt dem GPT-2-Referenzdesign (llm.c von A. Karpathy, MIT); GGUF ist das offene Format des llama.cpp-Projekts.
+Original development in Object Pascal. The training math follows the GPT-2 reference design (llm.c by A. Karpathy, MIT); GGUF is the open format of the llama.cpp project.

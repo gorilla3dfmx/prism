@@ -1,12 +1,12 @@
 unit Prism.Tensor;
 
-{ Batch-Kernels fuer das TRAINING (Forward- und Backward-Passes).
-  Mathematik-Port im Stil von llm.c (GPT-2), Pointer-basiert.
+{ Batch kernels for TRAINING (forward and backward passes).
+  Math port in the style of llm.c (GPT-2), pointer-based.
 
-  Konventionen:
-  - Alle Tensoren sind flache Single-Puffer, Aufrufer uebergibt Pointer.
-  - B = Batch, T = Sequenzlaenge, C = Kanaele, NH = Heads, OC = Out-Kanaele
-  - Backward-Funktionen AKKUMULIEREN in die d*-Puffer (vorher nullen!). }
+  Conventions:
+  - All tensors are flat Single buffers, the caller passes pointers.
+  - B = batch, T = sequence length, C = channels, NH = heads, OC = out channels
+  - Backward functions ACCUMULATE into the d* buffers (zero them first!). }
 
 {$POINTERMATH ON}
 
@@ -43,7 +43,7 @@ procedure GeluBackward(DInp, Inp, DOut: PSingle; N: Int64);
 procedure ResidualForward(OutP, A, B_: PSingle; N: Int64);
 procedure ResidualBackward(DA, DB, DOut: PSingle; N: Int64);
 
-{ residual3 = residual2 + gate * expertOut  (MoE, gate pro Token) }
+{ residual3 = residual2 + gate * expertOut  (MoE, gate per token) }
 procedure ScaledResidualForward(OutP, A, B_: PSingle; Gate: Single; N: Integer);
 
 procedure SoftmaxForward(Probs, Logits: PSingle; B, T, V: Integer);
@@ -183,7 +183,7 @@ end;
 procedure MatMulBackward(DInp, DW, DBias, DOut, Inp, W: PSingle;
   B, T, C, OC: Integer);
 begin
-  { Phase 1: dinp += dout * W  (parallel ueber Zeitschritte) }
+  { Phase 1: dinp += dout * W  (parallel over time steps) }
   if DInp <> nil then
     TParallel.&For(0, B * T - 1,
       procedure(BT: Integer)
@@ -205,7 +205,7 @@ begin
           end;
         end;
       end);
-  { Phase 2: dW += dout^T * inp, dbias += sum(dout)  (parallel ueber OC) }
+  { Phase 2: dW += dout^T * inp, dbias += sum(dout)  (parallel over OC) }
   TParallel.&For(0, OC - 1,
     procedure(OI: Integer)
     var
@@ -240,7 +240,7 @@ var
 begin
   HS := C div NH;
   Scale := 1.0 / Sqrt(HS);
-  { Inp = QKV [B,T,3C]; parallel ueber (b, h) }
+  { Inp = QKV [B,T,3C]; parallel over (b, h) }
   TParallel.&For(0, B * NH - 1,
     procedure(BH: Integer)
     var
@@ -301,8 +301,8 @@ var
 begin
   HS := C div NH;
   Scale := 1.0 / Sqrt(HS);
-  { parallel ueber b (innerhalb eines b sind Head-Slices disjunkt,
-    aber dK/dV-Schreibzugriffe ueberlappen ueber t -> pro b seriell) }
+  { parallel over b (within one b the head slices are disjoint,
+    but dK/dV writes overlap across t -> serial per b) }
   TParallel.&For(0, B - 1,
     procedure(BI: Integer)
     var
@@ -319,7 +319,7 @@ begin
           DO_ := DOut + (Int64(BI) * T + TI) * C + H * HS;
           Q := Inp + (Int64(BI) * T + TI) * 3 * C + H * HS;
           DQ := DInp + (Int64(BI) * T + TI) * 3 * C + H * HS;
-          { dV und dAtt }
+          { dV and dAtt }
           for T2 := 0 to TI do
           begin
             V := Inp + (Int64(BI) * T + T2) * 3 * C + 2 * C + H * HS;
@@ -332,7 +332,7 @@ begin
             end;
             DA[T2] := DA[T2] + D;
           end;
-          { Softmax-Backward: dPreatt }
+          { Softmax backward: dPreatt }
           for T2 := 0 to TI do
             for T3 := 0 to TI do
             begin
@@ -342,7 +342,7 @@ begin
                 LocalD := -A[T2] * A[T3];
               DPA[T3] := DPA[T3] + LocalD * DA[T2];
             end;
-          { dQ und dK }
+          { dQ and dK }
           for T2 := 0 to TI do
           begin
             K := Inp + (Int64(BI) * T + T2) * 3 * C + C + H * HS;

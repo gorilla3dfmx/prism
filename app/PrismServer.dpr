@@ -1,21 +1,21 @@
 program PrismServer;
 
-{ Prism REST-Server (Konsole, Windows/Linux/macOS).
+{ Prism REST server (console, Windows/Linux/macOS).
 
-  Eigenes Modell:
+  Custom model:
     PrismServer --model model\model.prism --tokenizer model\tokenizer.json --port 11434
 
-  Existierendes GGUF-Modell (llama.cpp-Format):
+  Existing GGUF model (llama.cpp format):
     PrismServer --model models\tinyllama-1.1b-chat.Q8_0.gguf --ctx 1024
 
-  Wichtige Optionen:
-    --stream-layers N   Cluster-Streaming: nur N Layer im RAM (0 = alle)
-    --experts-cache N   max. gecachte MoE-Experten (nur .prism)
-    --ctx N             Kontextfenster kappen (GGUF, spart KV-Cache-RAM)
-    --verify            Selbst-Verifikation standardmaessig aktiv
-    --train             Online-Finetuning via POST /api/train (nur .prism)
+  Important options:
+    --stream-layers N   Cluster streaming: only N layers in RAM (0 = all)
+    --experts-cache N   max. cached MoE experts (.prism only)
+    --ctx N             cap the context window (GGUF, saves KV-cache RAM)
+    --verify            self-verification enabled by default
+    --train             online finetuning via POST /api/train (.prism only)
     --template T        auto | prism | chatml | llama2 | plain
-    --gpu               OpenCL-GPU-Backend versuchen }
+    --gpu               try the OpenCL GPU backend }
 
 {$APPTYPE CONSOLE}
 
@@ -79,9 +79,9 @@ begin
 
     if Opts.ModelPath = '' then
     begin
-      Writeln('Prism ', PRISM_VERSION, ' - LLM-Server (OpenAI/Ollama-kompatibel)');
-      Writeln('Aufruf: PrismServer --model <datei.prism|datei.gguf> [Optionen]');
-      Writeln('        siehe README.md fuer alle Optionen');
+      Writeln('Prism ', PRISM_VERSION, ' - LLM server (OpenAI/Ollama compatible)');
+      Writeln('Usage: PrismServer --model <file.prism|file.gguf> [options]');
+      Writeln('        see README.md for all options');
       Halt(1);
     end;
 
@@ -92,11 +92,11 @@ begin
       end);
     try
       Server.Start;
-      Writeln('Beenden mit "quit" + Enter (oder Strg+C).');
+      Writeln('Stop with "quit" + Enter (or Ctrl+C).');
       while True do
       begin
         if Eof(Input) then
-          { stdin geschlossen (Hintergrund-/Dienstbetrieb): weiterlaufen }
+          { stdin closed (background/service operation): keep running }
           while True do
             TThread.Sleep(1000);
         Readln(Line);
@@ -109,7 +109,7 @@ begin
   except
     on E: Exception do
     begin
-      Writeln('FEHLER: ', E.Message);
+      Writeln('ERROR: ', E.Message);
       Halt(1);
     end;
   end;

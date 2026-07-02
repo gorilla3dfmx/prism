@@ -1,17 +1,17 @@
 unit Prism.Multimodal;
 
-{ Multimodale Trainingsdaten-Pipeline.
+{ Multimodal training data pipeline.
 
-  Ansatz: Byte-Level-Universalitaet. Der Prism-Tokenizer arbeitet auf
-  Bytes, daher ist JEDE Datenart tokenisierbar: Text, Bilder, Audio,
-  Video, 3D-Daten, beliebige Binaerdaten. Modalitaeten werden durch
-  Spezial-Token-Marker eingerahmt (<|img|>...<|/img|> usw.), so lernt
-  das Modell die Datenart vom Kontext zu unterscheiden.
+  Approach: byte-level universality. The Prism tokenizer operates on
+  bytes, so ANY kind of data can be tokenized: text, images, audio,
+  video, 3D data, arbitrary binary data. Modalities are framed by
+  special token markers (<|img|>...<|/img|> etc.), so the model learns
+  to distinguish the data type from context.
 
-  Grosse Rohdaten werden per Dezimation (Stride-Sampling) auf eine
-  Maximalgroesse reduziert. Fuer ernsthafte Bild-/Audio-Qualitaet sind
-  gelernte Encoder (Patch-/Mel-Embeddings) der naechste Schritt (Roadmap);
-  die Schnittstelle hier bleibt dieselbe. }
+  Large raw data is reduced to a maximum size via decimation
+  (stride sampling). For serious image/audio quality, learned encoders
+  (patch/mel embeddings) are the next step (roadmap); the interface
+  here stays the same. }
 
 interface
 
@@ -25,17 +25,17 @@ function ModalityFromString(const S: string): TModality;
 function ModalityOpenTag(M: TModality): string;
 function ModalityCloseTag(M: TModality): string;
 
-{ Reduziert Data per Stride-Sampling auf maximal MaxBytes }
+{ Reduces Data via stride sampling to at most MaxBytes }
 function DownsampleBytes(const Data: TBytes; MaxBytes: Integer): TBytes;
 
-{ Chat-Trainingssample: <|user|>Frage<|assistant|>Antwort<|eos|> }
+{ Chat training sample: <|user|>question<|assistant|>answer<|eos|> }
 function MakeTextSample(const UserText, AssistantText: string): TBytes;
 
-{ Multimodales Sample: Rohdaten + Beschreibung als Zielantwort }
+{ Multimodal sample: raw data + description as target answer }
 function MakeDataSample(const Data: TBytes; M: TModality;
   const Description: string; MaxBytes: Integer = 65536): TBytes;
 
-{ Thread-sicheres Anhaengen an die Korpus-Datei }
+{ Thread-safe appending to the corpus file }
 procedure AppendToCorpus(const CorpusPath: string; const Sample: TBytes);
 
 implementation

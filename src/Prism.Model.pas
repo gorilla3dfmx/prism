@@ -1,14 +1,14 @@
 unit Prism.Model;
 
-{ Eigenes Prism-Checkpoint-Format (.prism) und Gewichts-Provider.
+{ Prism's own checkpoint format (.prism) and weights providers.
 
-  Dateiformat:
-    Header (64 Bytes): Magic 'PRSM', Version, Config
-    danach alle Parameter als Float32 im TParamLayout-Flat-Layout.
+  File format:
+    Header (64 bytes): magic 'PRSM', version, config
+    followed by all parameters as Float32 in the TParamLayout flat layout.
 
-  TWeightsProvider abstrahiert den Zugriff:
-    - TFullWeights: alles im RAM (Training, schnellste Inferenz)
-    - TLayerStore (Prism.Streaming): Layer/Experten-Cluster von Platte (LRU) }
+  TWeightsProvider abstracts the access:
+    - TFullWeights: everything in RAM (training, fastest inference)
+    - TLayerStore (Prism.Streaming): layer/expert clusters from disk (LRU) }
 
 interface
 
@@ -32,13 +32,13 @@ type
   public
     Config: TModelConfig;
     Layout: TParamLayout;
-    { Enthaelt mindestens den Resident-Prefix (wte, wpe, lnf) an den
-      Layout-Offsets. Bei TFullWeights identisch mit Params. }
+    { Contains at least the resident prefix (wte, wpe, lnf) at the
+      layout offsets. For TFullWeights it is identical to Params. }
     Resident: TArray<Single>;
-    { Layer-Core: Arr[Base + Layout.R*] }
+    { Layer core: Arr[Base + Layout.R*] }
     procedure GetLayer(L: Integer; out Arr: TArray<Single>;
       out Base: Int64); virtual; abstract;
-    { Experte: Arr[Base + Layout.X*] }
+    { Expert: Arr[Base + Layout.X*] }
     procedure GetExpert(L, E: Integer; out Arr: TArray<Single>;
       out Base: Int64); virtual; abstract;
   end;
@@ -88,9 +88,9 @@ var
 begin
   Stream.ReadBuffer(H, SizeOf(H));
   if H.Magic <> CHECKPOINT_MAGIC then
-    raise Exception.Create('Keine gueltige Prism-Checkpoint-Datei (Magic).');
+    raise Exception.Create('Not a valid Prism checkpoint file (magic).');
   if H.Version <> CHECKPOINT_VERSION then
-    raise Exception.CreateFmt('Checkpoint-Version %d nicht unterstuetzt.',
+    raise Exception.CreateFmt('Checkpoint version %d not supported.',
       [H.Version]);
   Result.VocabSize := H.VocabSize;
   Result.SeqLen := H.SeqLen;
@@ -174,7 +174,7 @@ begin
   C := Config.Dim;
   H := Config.Hidden;
   Std := 0.02;
-  { GPT-2-Trick: Residual-Projektionen kleiner initialisieren }
+  { GPT-2 trick: initialize residual projections with a smaller scale }
   ResidStd := 0.02 / Sqrt(2.0 * Config.NumLayers);
 
   FillGauss(Layout.OffWte, Int64(Config.VocabSize) * C, Std);
@@ -204,7 +204,7 @@ begin
       FillConst(XB + Layout.XFc2B, C, 0.0);
     end;
   end;
-  { Wpe etwas kleiner starten hilft der Stabilitaet bei kleinen Modellen }
+  { Starting Wpe somewhat smaller helps stability for small models }
   for I := Layout.OffWpe to Layout.OffWpe + Int64(Config.SeqLen) * C - 1 do
     Params[I] := Params[I] * 0.5;
 end;
@@ -214,7 +214,7 @@ var
   FS: TFileStream;
   Written, ChunkFloats: Int64;
 const
-  MAX_CHUNK = 64 * 1024 * 1024; // in 64M-Float-Bloecken schreiben
+  MAX_CHUNK = 64 * 1024 * 1024; // write in 64M-float blocks
 begin
   FS := TFileStream.Create(Path, fmCreate);
   try

@@ -1,15 +1,15 @@
 unit Prism.Gpu;
 
-{ Experimentelles GPU-Backend ueber OpenCL - OHNE Third-Party-Libraries:
-  die OpenCL-Bibliothek des Systems/Treibers wird zur Laufzeit dynamisch
-  geladen (Windows: OpenCL.dll, Linux/Android: libOpenCL.so,
-  macOS: OpenCL.framework). Ist kein OpenCL verfuegbar (z.B. iOS),
-  laeuft transparent das CPU-Backend.
+{ Experimental GPU backend via OpenCL - WITHOUT third-party libraries:
+  the system's/driver's OpenCL library is loaded dynamically at runtime
+  (Windows: OpenCL.dll, Linux/Android: libOpenCL.so,
+  macOS: OpenCL.framework). If no OpenCL is available (e.g. iOS),
+  the CPU backend runs transparently.
 
-  Beschleunigt werden die grossen F32-MatVec-Operationen (eigene
-  Prism-Modelle). Gewichtszeilen werden einmalig in GPU-Buffer hochgeladen
-  und gecacht; das Streaming meldet Evictions via InvalidateWeights.
-  Quantisierte GGUF-Kernels laufen derzeit auf der CPU (Roadmap). }
+  Accelerated are the large F32 MatVec operations (Prism's own models).
+  Weight rows are uploaded once into GPU buffers and cached; the
+  streaming layer reports evictions via InvalidateWeights.
+  Quantized GGUF kernels currently run on the CPU (roadmap). }
 
 {$POINTERMATH ON}
 
@@ -41,14 +41,14 @@ uses Posix.Dlfcn;
 {$ENDIF}
 
 type
-  { Winapi.Windows deklariert ein eigenes PSingle - hier eindeutig machen }
+  { Winapi.Windows declares its own PSingle - disambiguate it here }
   PSingle = System.PSingle;
 
   TCpuBackend = class(TComputeBackend);
 
 function TComputeBackend.Name: string;
 begin
-  Result := 'CPU (' + IntToStr(TThread.ProcessorCount) + ' Threads)';
+  Result := 'CPU (' + IntToStr(TThread.ProcessorCount) + ' threads)';
 end;
 
 procedure TComputeBackend.MatVecF32W(Y, W, X: PSingle; Rows, Cols: Integer;
@@ -61,7 +61,7 @@ procedure TComputeBackend.InvalidateWeights(WKey: Pointer);
 begin
 end;
 
-{ ---------- OpenCL (dynamisch geladen) ---------- }
+{ ---------- OpenCL (dynamically loaded) ---------- }
 
 const
   CL_DEVICE_TYPE_GPU = 4;
@@ -173,7 +173,7 @@ type
 
 const
   MAX_GPU_CACHE_BYTES: Int64 = 256 * 1024 * 1024;
-  GPU_MIN_WORK = 256 * 1024; // darunter ist der Transfer-Overhead groesser
+  GPU_MIN_WORK = 256 * 1024; // below this the transfer overhead dominates
 
 var
   GBackend: TComputeBackend = nil;
@@ -253,7 +253,7 @@ begin
   Info := '';
   if not LoadCLLibrary(FLib) then
   begin
-    Info := 'OpenCL-Bibliothek nicht gefunden';
+    Info := 'OpenCL library not found';
     Exit;
   end;
   clGetPlatformIDs := TclGetPlatformIDs(GetCLProc(FLib, 'clGetPlatformIDs'));
@@ -285,12 +285,12 @@ begin
     Assigned(clEnqueueReadBuffer) and Assigned(clEnqueueNDRangeKernel) and
     Assigned(clFinish) and Assigned(clReleaseMemObject)) then
   begin
-    Info := 'OpenCL-Symbole unvollstaendig';
+    Info := 'OpenCL symbols incomplete';
     Exit;
   end;
   if (clGetPlatformIDs(8, @Platforms[0], @NumPlat) <> 0) or (NumPlat = 0) then
   begin
-    Info := 'Keine OpenCL-Plattform';
+    Info := 'No OpenCL platform';
     Exit;
   end;
   FDevice := nil;
@@ -302,7 +302,7 @@ begin
       FDevice := nil;
   if FDevice = nil then
   begin
-    Info := 'Keine GPU gefunden';
+    Info := 'No GPU found';
     Exit;
   end;
   FillChar(NameBuf, SizeOf(NameBuf), 0);
@@ -312,13 +312,13 @@ begin
   FContext := clCreateContext(nil, 1, @FDevice, nil, nil, @Err);
   if (FContext = nil) or (Err <> 0) then
   begin
-    Info := 'clCreateContext fehlgeschlagen';
+    Info := 'clCreateContext failed';
     Exit;
   end;
   FQueue := clCreateCommandQueue(FContext, FDevice, 0, @Err);
   if (FQueue = nil) or (Err <> 0) then
   begin
-    Info := 'clCreateCommandQueue fehlgeschlagen';
+    Info := 'clCreateCommandQueue failed';
     Exit;
   end;
   Src := PAnsiChar(KERNEL_SRC);
@@ -326,18 +326,18 @@ begin
   FProgram := clCreateProgramWithSource(FContext, 1, @Src, @SrcLen, @Err);
   if (FProgram = nil) or (Err <> 0) then
   begin
-    Info := 'Kernel-Quelle fehlgeschlagen';
+    Info := 'Kernel source failed';
     Exit;
   end;
   if clBuildProgram(FProgram, 1, @FDevice, '', nil, nil) <> 0 then
   begin
-    Info := 'Kernel-Build fehlgeschlagen';
+    Info := 'Kernel build failed';
     Exit;
   end;
   FKernel := clCreateKernel(FProgram, 'matvec', @Err);
   if (FKernel = nil) or (Err <> 0) then
   begin
-    Info := 'clCreateKernel fehlgeschlagen';
+    Info := 'clCreateKernel failed';
     Exit;
   end;
   Info := 'OpenCL: ' + FDeviceName;
@@ -362,7 +362,7 @@ begin
     Exit(E.Mem);
   Bytes := Int64(Rows) * Cols * SizeOf(Single);
   if FCacheBytes + Bytes > MAX_GPU_CACHE_BYTES then
-    Exit(nil); // Cache voll -> CPU-Fallback fuer diese Matrix
+    Exit(nil); // cache full -> CPU fallback for this matrix
   E.Mem := clCreateBuffer(FContext, CL_MEM_READ_ONLY or CL_MEM_COPY_HOST_PTR,
     Bytes, W, @Err);
   if (E.Mem = nil) or (Err <> 0) then
@@ -467,7 +467,7 @@ begin
       clFinish(FQueue);
     if Err <> 0 then
     begin
-      FBroken := True; // dauerhaft auf CPU zurueckfallen
+      FBroken := True; // fall back to CPU permanently
       FLock.Leave;
       try
         inherited;

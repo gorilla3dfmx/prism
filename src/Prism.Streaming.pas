@@ -1,15 +1,14 @@
 unit Prism.Streaming;
 
-{ Cluster-Streaming fuer .prism-Checkpoints: statt das komplette Modell in
-  den Speicher zu laden, werden nur der Resident-Prefix (Embeddings + finale
-  Norm) dauerhaft gehalten. Layer-Cores und einzelne FFN-Experten
-  ("thematische Areale") werden bedarfsweise von Platte gelesen und in
-  LRU-Caches gehalten.
+{ Cluster streaming for .prism checkpoints: instead of loading the complete
+  model into memory, only the resident prefix (embeddings + final norm) is
+  kept permanently. Layer cores and individual FFN experts ("thematic
+  areas") are read from disk on demand and kept in LRU caches.
 
-  Speicherbedarf ~ Resident + MaxLayers * LayerCore + MaxExperts * Expert
-  statt der vollen Parameterzahl - entscheidend fuer mobile Geraete.
-  Bei MoE wird pro Token ohnehin nur EIN Experte pro Layer angefasst,
-  d.h. haeufig genutzte Areale bleiben im Cache "warm". }
+  Memory footprint ~ Resident + MaxLayers * LayerCore + MaxExperts * Expert
+  instead of the full parameter count - crucial for mobile devices.
+  With MoE only ONE expert per layer is touched per token anyway,
+  i.e. frequently used areas stay "warm" in the cache. }
 
 interface
 
@@ -32,8 +31,8 @@ type
     function ReadFloats(FileOffFloats: Int64; Count: Int64): TArray<Single>;
     class function ExpertKey(L, E: Integer): Int64; static; inline;
   public
-    { MaxCachedLayers/MaxCachedExperts steuern den Speicherverbrauch.
-      MaxCachedExperts gilt ueber alle Layer hinweg. }
+    { MaxCachedLayers/MaxCachedExperts control the memory consumption.
+      MaxCachedExperts applies across all layers. }
     constructor Create(const Path: string; MaxCachedLayers: Integer = 4;
       MaxCachedExperts: Integer = 8);
     destructor Destroy; override;
@@ -113,7 +112,7 @@ begin
     while FCoreOrder.Count > FMaxLayers do
     begin
       if FCoreCache.TryGetValue(FCoreOrder[0], Doomed) then
-        Backend.InvalidateWeights(Pointer(Doomed)); // GPU-Buffer verwerfen
+        Backend.InvalidateWeights(Pointer(Doomed)); // discard GPU buffers
       FCoreCache.Remove(FCoreOrder[0]);
       FCoreOrder.Delete(0);
     end;
@@ -168,7 +167,7 @@ function TLayerStore.StatsText: string;
 begin
   FLock.Enter;
   try
-    Result := Format('LayerCache: %d/%d (Hitrate %s), ExpertCache: %d/%d (Hitrate %s)',
+    Result := Format('LayerCache: %d/%d (hit rate %s), ExpertCache: %d/%d (hit rate %s)',
       [FCoreCache.Count, FMaxLayers, Pct(FCoreHits, FCoreReads),
        FExpertCache.Count, FMaxExperts, Pct(FExpertHits, FExpertReads)]);
   finally

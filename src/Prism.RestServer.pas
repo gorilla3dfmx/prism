@@ -1,22 +1,22 @@
 unit Prism.RestServer;
 
-{ REST-Schnittstelle, kompatibel zu OpenAI- und Ollama-Clients.
+{ REST interface, compatible with OpenAI and Ollama clients.
 
-  OpenAI-kompatibel:
+  OpenAI-compatible:
     GET  /v1/models
     POST /v1/chat/completions   (stream: SSE "data: ...")
     POST /v1/completions
-  Ollama-kompatibel:
+  Ollama-compatible:
     GET  /api/tags, /api/version
     POST /api/generate, /api/chat  (stream: NDJSON)
-  Prism-Erweiterungen:
-    GET  /health                 Status + Modellinfo
-    POST /api/train              Trainingssample einspeisen (Text/multimodal)
+  Prism extensions:
+    GET  /health                 Status + model info
+    POST /api/train              Feed a training sample (text/multimodal)
 
-  Zusatzfelder in Chat-Requests:
-    "verify": true  -> Selbst-Verifikation, Ergebnis in "x_verification"
+  Additional fields in chat requests:
+    "verify": true  -> self-verification, result in "x_verification"
 
-  Implementiert mit TIdHTTPServer (Indy, Bestandteil von Delphi). }
+  Implemented with TIdHTTPServer (Indy, part of Delphi). }
 
 interface
 
@@ -32,11 +32,11 @@ uses
 type
   TServerOptions = record
     Port: Integer;
-    ModelPath: string;       // .prism oder .gguf
-    TokenizerPath: string;   // nur fuer .prism
-    StreamLayers: Integer;   // 0 = Modell komplett in den RAM
+    ModelPath: string;       // .prism or .gguf
+    TokenizerPath: string;   // only for .prism
+    StreamLayers: Integer;   // 0 = load the whole model into RAM
     MaxCachedExperts: Integer;
-    CtxOverride: Integer;    // GGUF-Kontextfenster kappen (RAM)
+    CtxOverride: Integer;    // cap the GGUF context window (RAM)
     VerifyDefault: Boolean;
     TrainEnabled: Boolean;
     CorpusPath: string;
@@ -199,20 +199,20 @@ begin
   if AOpts.UseGpu then
   begin
     if TryInitGpuBackend(GpuInfo) then
-      Log('GPU-Backend aktiv: ' + GpuInfo)
+      Log('GPU backend active: ' + GpuInfo)
     else
-      Log('GPU nicht verfuegbar (' + GpuInfo + '), nutze CPU.');
+      Log('GPU not available (' + GpuInfo + '), using CPU.');
   end;
 
   Ext := LowerCase(ExtractFileExt(AOpts.ModelPath));
   if Ext = '.gguf' then
   begin
-    Log('Lade GGUF-Modell: ' + AOpts.ModelPath);
+    Log('Loading GGUF model: ' + AOpts.ModelPath);
     FBackend := TLlamaBackend.Create(AOpts.ModelPath, AOpts.CtxOverride,
       AOpts.StreamLayers, procedure(S: string) begin Log(S); end);
     if FTemplate <> ctAuto then
       TLlamaBackend(FBackend).Template := FTemplate;
-    Log(Format('GGUF bereit: %s (Arch %s, Vokabular %d, Kontext %d)',
+    Log(Format('GGUF ready: %s (arch %s, vocab %d, context %d)',
       [FBackend.ModelName, TLlamaBackend(FBackend).Model.Gguf.Arch,
        TLlamaBackend(FBackend).Model.Cfg.Vocab,
        TLlamaBackend(FBackend).Model.Cfg.CtxLen]));
@@ -220,24 +220,24 @@ begin
   else
   begin
     if not FileExists(AOpts.TokenizerPath) then
-      raise Exception.Create('Tokenizer-Datei fehlt: ' + AOpts.TokenizerPath);
+      raise Exception.Create('Tokenizer file missing: ' + AOpts.TokenizerPath);
     Tok := TTokenizer.Create;
     Tok.LoadFromFile(AOpts.TokenizerPath);
     if AOpts.StreamLayers > 0 then
     begin
-      Log(Format('Lade Prism-Modell (Streaming, %d Layer im Cache): %s',
+      Log(Format('Loading Prism model (streaming, %d layers in cache): %s',
         [AOpts.StreamLayers, AOpts.ModelPath]));
       Prov := TLayerStore.Create(AOpts.ModelPath, AOpts.StreamLayers,
         AOpts.MaxCachedExperts);
     end
     else
     begin
-      Log('Lade Prism-Modell (komplett im RAM): ' + AOpts.ModelPath);
+      Log('Loading Prism model (fully in RAM): ' + AOpts.ModelPath);
       Full := TFullWeights.Create;
       Full.LoadFromFile(AOpts.ModelPath);
       Prov := Full;
     end;
-    Log('Konfiguration: ' + Prov.Config.ToString);
+    Log('Configuration: ' + Prov.Config.ToString);
     FBackend := TPrismBackend.Create(Prov, Tok,
       TPath.GetFileNameWithoutExtension(AOpts.ModelPath));
     if AOpts.TrainEnabled then
@@ -247,10 +247,10 @@ begin
         FTrainSvc := TTrainingService.Create(TFullWeights(Prov), Tok,
           FGenLock, AOpts.ModelPath, nil,
           procedure(S: string) begin Log(S); end);
-        Log('Online-Training aktiv (POST /api/train).');
+        Log('Online training active (POST /api/train).');
       end
       else
-        Log('Hinweis: Online-Training braucht --stream-layers 0; deaktiviert.');
+        Log('Note: online training requires --stream-layers 0; disabled.');
     end;
   end;
 
@@ -260,8 +260,8 @@ begin
   FHttp.DefaultPort := AOpts.Port;
   FHttp.OnCommandGet := DoCommand;
   FHttp.OnCommandOther := DoCommandOther;
-  { Body immer als PostStream durchreichen - sonst konsumiert Indy
-    form-kodierte POSTs (Clients ohne Content-Type: application/json) }
+  { Always pass the body through as PostStream - otherwise Indy consumes
+    form-encoded POSTs (clients without Content-Type: application/json) }
   FHttp.ParseParams := False;
   FHttp.ServerSoftware := 'Prism/' + PRISM_VERSION;
 end;
@@ -290,7 +290,7 @@ end;
 procedure TPrismRestServer.Start;
 begin
   FHttp.Active := True;
-  Log(Format('Prism-Server laeuft auf Port %d', [FOpts.Port]));
+  Log(Format('Prism server running on port %d', [FOpts.Port]));
   Log('  OpenAI-API:  POST http://localhost:' + IntToStr(FOpts.Port) +
     '/v1/chat/completions');
   Log('  Ollama-API:  POST http://localhost:' + IntToStr(FOpts.Port) +
@@ -319,8 +319,8 @@ begin
       SS.Free;
     end;
   end;
-  { Clients ohne "Content-Type: application/json": Indy legt den Body bei
-    form-urlencoded in FormParams ab statt in PostStream }
+  { Clients without "Content-Type: application/json": for form-urlencoded,
+    Indy places the body in FormParams instead of PostStream }
   if (Result = '') and (ARequestInfo.FormParams <> '') then
     Result := ARequestInfo.FormParams;
 end;
@@ -357,8 +357,8 @@ begin
   AResponseInfo.ResponseNo := 200;
   AResponseInfo.ContentType := ContentType;
   AResponseInfo.CharSet := 'utf-8';
-  { Chunked: sonst erzwingt Indys WriteHeader eine Content-Length und der
-    Client trennt nach dem ersten Segment }
+  { Chunked: otherwise Indy's WriteHeader forces a Content-Length and the
+    client disconnects after the first segment }
   AResponseInfo.TransferEncoding := 'chunked';
   AResponseInfo.CloseConnection := True;
   AResponseInfo.CustomHeaders.AddValue('Cache-Control', 'no-cache');
@@ -415,7 +415,7 @@ begin
   Result.MaxTokens := Round(GetNum(Body, 'max_tokens',
     GetNum(Body, 'max_completion_tokens', Result.MaxTokens)));
   Result.Seed := UInt64(Round(GetNum(Body, 'seed', 0)));
-  { Ollama packt Optionen in "options" }
+  { Ollama packs options into "options" }
   OllamaOpts := Body.GetValue('options') as TJSONObject;
   if OllamaOpts <> nil then
   begin
@@ -444,8 +444,8 @@ var
   StreamWrite: TProc<string>;
   ChunkJson: TFunc<string, Boolean, string>;
 begin
-  { Als Closure-Variablen statt lokaler Routinen, damit sie aus dem
-    OnToken-Callback heraus aufrufbar sind (E2555) }
+  { As closure variables instead of local routines, so they can be called
+    from within the OnToken callback (E2555) }
   StreamWrite :=
     procedure(S: string)
     begin
@@ -501,7 +501,7 @@ begin
   ParseMessages(Body, Msgs, LastUser);
   if Length(Msgs) = 0 then
   begin
-    SendError(AResponseInfo, 400, 'Feld "messages" fehlt oder ist leer.');
+    SendError(AResponseInfo, 400, 'Field "messages" is missing or empty.');
     Exit;
   end;
   SP := ParseSampling(Body);
@@ -736,7 +736,7 @@ begin
   else
   begin
     SendError(AResponseInfo, 400,
-      'Erwartet: {"user","assistant"} oder {"text"} oder {"data","modality","description"}.');
+      'Expected: {"user","assistant"} or {"text"} or {"data","modality","description"}.');
     Exit;
   end;
 
@@ -747,10 +747,10 @@ begin
   if FTrainSvc <> nil then
   begin
     FTrainSvc.EnqueueSample(Sample);
-    Root.AddPair('status', 'training'); // Online-Finetuning laeuft im Hintergrund
+    Root.AddPair('status', 'training'); // online finetuning runs in the background
   end
   else
-    Root.AddPair('status', 'stored');   // Offline-Training via PrismTrain-CLI
+    Root.AddPair('status', 'stored');   // offline training via the PrismTrain CLI
   SendJson(AResponseInfo, Root);
 end;
 
@@ -806,7 +806,7 @@ end;
 procedure TPrismRestServer.DoCommandOther(AContext: TIdContext;
   ARequestInfo: TIdHTTPRequestInfo; AResponseInfo: TIdHTTPResponseInfo);
 begin
-  { CORS-Preflight }
+  { CORS preflight }
   AResponseInfo.ResponseNo := 204;
   AResponseInfo.CustomHeaders.AddValue('Access-Control-Allow-Origin', '*');
   AResponseInfo.CustomHeaders.AddValue('Access-Control-Allow-Methods',
@@ -835,7 +835,7 @@ begin
           Body := TJSONObject.ParseJSONValue(BodyS) as TJSONObject;
         if Body = nil then
         begin
-          SendError(AResponseInfo, 400, 'Ungueltiger JSON-Body.');
+          SendError(AResponseInfo, 400, 'Invalid JSON body.');
           Exit;
         end;
       end;
@@ -860,11 +860,11 @@ begin
       else if (Doc = '/') or (Doc = '/health') then
         HandleHealth(AResponseInfo)
       else
-        SendError(AResponseInfo, 404, 'Unbekannter Endpunkt: ' + Doc);
+        SendError(AResponseInfo, 404, 'Unknown endpoint: ' + Doc);
     except
       on E: Exception do
       begin
-        Log('Fehler [' + Doc + ']: ' + E.Message);
+        Log('Error [' + Doc + ']: ' + E.Message);
         if not AResponseInfo.HeaderHasBeenWritten then
           SendError(AResponseInfo, 500, E.Message);
       end;

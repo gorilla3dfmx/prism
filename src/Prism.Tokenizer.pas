@@ -1,11 +1,11 @@
 unit Prism.Tokenizer;
 
-{ Eigener Byte-Level-BPE-Tokenizer fuer trainierbare Prism-Modelle.
+{ Custom byte-level BPE tokenizer for trainable Prism models.
 
-  Byte-Level = JEDE Datenart ist tokenisierbar (Text, Bilder, Audio, Video,
-  3D-Daten, Binaerdaten) - das ist die Grundlage der Multimodalitaet:
-  Basis-Vokabular sind die 256 Bytes, darauf gelernte BPE-Merges, dahinter
-  feste Spezial-Tokens (Chat-Rollen und Modalitaets-Marker). }
+  Byte-level = ANY kind of data is tokenizable (text, images, audio, video,
+  3D data, binary data) - this is the foundation of multimodality:
+  the base vocabulary is the 256 bytes, on top of that learned BPE merges,
+  followed by fixed special tokens (chat roles and modality markers). }
 
 interface
 
@@ -48,7 +48,7 @@ type
     function EosId: Integer; override;
     function IsStopToken(Id: Integer): Boolean; override;
 
-    { BPE-Merges aus Rohdaten lernen. TargetVocab = 256 + Merges + Specials }
+    { Learn BPE merges from raw data. TargetVocab = 256 + merges + specials }
     procedure TrainFromData(const Data: TBytes; TargetVocab: Integer;
       MaxBytes: Integer; const Log: TProc<string>);
 
@@ -114,7 +114,7 @@ end;
 
 function TTokenizer.IsStopToken(Id: Integer): Boolean;
 begin
-  { Jedes Spezial-Token beendet die Generierung (Rollenwechsel etc.) }
+  { Every special token stops generation (role switch etc.) }
   Result := IsSpecial(Id) and (Id <> SpecialId(SP_PAD));
 end;
 
@@ -283,7 +283,7 @@ var
 begin
   Res := TList<Integer>.Create;
   try
-    { Kein BOS: das Prism-Korpusformat beginnt direkt mit <|user|> }
+    { No BOS: the Prism corpus format starts directly with <|user|> }
     for M in Msgs do
     begin
       if SameText(M.Role, 'system') then
@@ -324,8 +324,8 @@ begin
   SetLength(FMergeB, 0);
   RebuildTables;
 
-  { Ids-Strom aufbauen, -1 als Trenner an Spezial-Token-Grenzen
-    (es darf nicht ueber Marker hinweg gemergt werden) }
+  { Build the id stream, -1 as separator at special-token boundaries
+    (merging must not cross markers) }
   SetLength(Ids, Length(Src));
   N := 0;
   I := 0;
@@ -384,14 +384,14 @@ begin
           BestB := Integer(UInt32(Pair.Key and $FFFFFFFF));
         end;
       if BestA < 0 then
-        Break; // keine wiederholten Paare mehr
+        Break; // no more repeated pairs
       SetLength(FMergeA, Length(FMergeA) + 1);
       SetLength(FMergeB, Length(FMergeB) + 1);
       FMergeA[High(FMergeA)] := BestA;
       FMergeB[High(FMergeB)] := BestB;
       MergePass(Ids, N, BestA, BestB, 256 + M);
       if Assigned(Log) and ((M mod 25 = 0) or (M = NumMerges - 1)) then
-        Log(Format('Merge %d/%d: (%d,%d) x%d, Strom=%d Tokens',
+        Log(Format('Merge %d/%d: (%d,%d) x%d, stream=%d tokens',
           [M + 1, NumMerges, BestA, BestB, BestCount, N]));
     end;
   finally
@@ -434,7 +434,7 @@ var
 begin
   Root := TJSONObject.ParseJSONValue(TFile.ReadAllText(Path, TEncoding.UTF8));
   if Root = nil then
-    raise Exception.Create('Tokenizer: JSON konnte nicht geparst werden: ' + Path);
+    raise Exception.Create('Tokenizer: could not parse JSON: ' + Path);
   try
     Arr := Root.GetValue<TJSONArray>('merges');
     SetLength(FMergeA, Arr.Count);

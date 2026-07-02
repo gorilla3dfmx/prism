@@ -1,18 +1,18 @@
 unit Prism.Llama;
 
-{ Inferenz-Engine fuer Llama-Architektur-Modelle aus GGUF-Dateien:
-  RMSNorm + Rotary Position Embeddings (RoPE) + Grouped-Query-Attention
-  + SwiGLU-FFN. Damit laufen existierende trainierte Modelle
-  (TinyLlama, Llama 2/3, Mistral, Qwen2, ...) direkt in Prism.
+{ Inference engine for Llama-architecture models from GGUF files:
+  RMSNorm + Rotary Position Embeddings (RoPE) + grouped-query attention
+  + SwiGLU FFN. This lets existing trained models
+  (TinyLlama, Llama 2/3, Mistral, Qwen2, ...) run directly in Prism.
 
-  Speicher-Strategie ("Clustering") wie beim eigenen Format:
-  - StreamLayers = 0: alle Layer beim Start in den RAM (schnellste Inferenz)
-  - StreamLayers > 0: nur N Layer gleichzeitig im LRU-Cache, der Rest wird
-    bedarfsweise aus der GGUF-Datei nachgeladen -> Milliarden-Parameter-
-    Modelle auf Geraeten mit wenig RAM (Kosten: Platten-I/O pro Layer).
+  Memory strategy ("clustering"), same as for the native format:
+  - StreamLayers = 0: all layers loaded into RAM at startup (fastest inference)
+  - StreamLayers > 0: only N layers in an LRU cache at a time, the rest is
+    reloaded on demand from the GGUF file -> billion-parameter models on
+    devices with little RAM (cost: disk I/O per layer).
 
-  Die Gewichte bleiben quantisiert (Q4/Q8) im Speicher und werden in den
-  Fused-Kernels aus Prism.Vector direkt verrechnet. }
+  The weights stay quantized (Q4/Q8) in memory and are consumed directly
+  by the fused kernels from Prism.Vector. }
 
 {$POINTERMATH ON}
 
@@ -28,11 +28,11 @@ type
     Dim: Integer;          // embedding_length
     NLayers: Integer;
     NHeads: Integer;
-    NKvHeads: Integer;     // GQA; = NHeads bei MHA
+    NKvHeads: Integer;     // GQA; = NHeads for MHA
     HeadDim: Integer;
     FfnDim: Integer;
     Vocab: Integer;
-    CtxLen: Integer;       // effektive Kontextlaenge (ggf. gekappt)
+    CtxLen: Integer;       // effective context length (possibly capped)
     RopeBase: Single;
     RmsEps: Single;
     RopeNeox: Boolean;
@@ -43,7 +43,7 @@ type
   TLlamaLayer = class
   public
     AttnNorm, FfnNorm: TArray<Single>;
-    Bq, Bk, Bv: TArray<Single>; // optionale Biases (z.B. Qwen2)
+    Bq, Bk, Bv: TArray<Single>; // optional biases (e.g. Qwen2)
     Wq, Wk, Wv, Wo, WGate, WDown, WUp: TQTensor;
   end;
 
@@ -61,8 +61,8 @@ type
     Cfg: TLlamaConfig;
     TokenEmbd, OutputW: TQTensor;
     OutputNorm: TArray<Single>;
-    { CtxOverride > 0 kappt das Kontextfenster (spart KV-Cache-RAM).
-      StreamLayers = 0: alles vorladen; > 0: LRU-Streaming mit N Layern. }
+    { CtxOverride > 0 caps the context window (saves KV-cache RAM).
+      StreamLayers = 0: preload everything; > 0: LRU streaming with N layers. }
     constructor Create(Gg: TGgufFile; CtxOverride: Integer;
       StreamLayers: Integer; const Log: TProc<string>);
     destructor Destroy; override;
@@ -77,7 +77,7 @@ type
     FModel: TLlamaModel;
     FPos: Integer;
     FKCache, FVCache: TArray<TArray<Single>>;
-    FKCacheCur, FVCacheCur: TArray<Single>; // Cache des aktuellen Layers
+    FKCacheCur, FVCacheCur: TArray<Single>; // cache of the current layer
     FX, FXb, FQ, FK, FV, FAttOut, FHb, FHb2, FLogits: TArray<Single>;
     FInvFreq: TArray<Single>;
     procedure Rope(Vec: PSingle; NHeadsVec, Pos: Integer);
@@ -156,7 +156,7 @@ begin
   Cfg.HeadDim := Integer(Gg.MetaInt(A + '.attention.key_length', 0));
   if (Cfg.Dim = 0) or (Cfg.NLayers = 0) or (Cfg.NHeads = 0) then
     raise Exception.CreateFmt(
-      'GGUF: Architektur "%s" liefert keine vollstaendige Llama-Konfiguration.',
+      'GGUF: architecture "%s" does not provide a complete Llama configuration.',
       [A]);
   if Cfg.HeadDim = 0 then
     Cfg.HeadDim := Cfg.Dim div Cfg.NHeads;
@@ -186,11 +186,11 @@ begin
       Lay := LoadLayer(L);
       FLayers.Add(L, Lay);
       if (L mod 4 = 0) or (L = Cfg.NLayers - 1) then
-        LogMsg(Format('Layer %d/%d geladen', [L + 1, Cfg.NLayers]));
+        LogMsg(Format('Layer %d/%d loaded', [L + 1, Cfg.NLayers]));
     end;
   end
   else
-    LogMsg(Format('Streaming-Modus: max. %d von %d Layern im RAM',
+    LogMsg(Format('Streaming mode: max. %d of %d layers in RAM',
       [FMaxCached, Cfg.NLayers]));
 end;
 
@@ -243,7 +243,7 @@ begin
     FOrder.Add(L);
     while FOrder.Count > FMaxCached do
     begin
-      FLayers.Remove(FOrder[0]); // doOwnsValues gibt den Layer frei
+      FLayers.Remove(FOrder[0]); // doOwnsValues frees the layer
       FOrder.Delete(0);
     end;
   finally
@@ -398,9 +398,9 @@ var
   C, QD, KvD, Ffn: Integer;
 begin
   if FPos >= FModel.Cfg.CtxLen then
-    raise Exception.Create('Kontextfenster erschoepft.');
+    raise Exception.Create('Context window exhausted.');
   if (Token < 0) or (Token >= FModel.Cfg.Vocab) then
-    raise Exception.CreateFmt('Ungueltiges Token %d', [Token]);
+    raise Exception.CreateFmt('Invalid token %d', [Token]);
   C := FModel.Cfg.Dim;
   QD := FModel.Cfg.QDim;
   KvD := FModel.Cfg.KvDim;
@@ -466,7 +466,7 @@ end;
 destructor TLlamaBackend.Destroy;
 begin
   FTok.Free;
-  FModel.Free; // gibt auch TGgufFile frei
+  FModel.Free; // also frees the TGgufFile
   inherited;
 end;
 

@@ -1,18 +1,18 @@
 unit Prism.Gguf;
 
-{ GGUF-Reader in reinem Object Pascal: laedt existierende, bereits
-  trainierte LLMs aus dem llama.cpp-Oekosystem (TinyLlama, Llama, Mistral,
-  Qwen, ...) OHNE Konvertierung direkt aus der .gguf-Datei.
+{ GGUF reader in pure Object Pascal: loads existing, already trained
+  LLMs from the llama.cpp ecosystem (TinyLlama, Llama, Mistral,
+  Qwen, ...) directly from the .gguf file WITHOUT any conversion.
 
-  Unterstuetzt:
-  - GGUF Version 2 und 3
-  - Tensor-Typen F32, F16, Q4_0, Q4_1, Q8_0 (andere -> requantisieren,
-    z.B. mit llama-quantize nach Q8_0/Q4_0)
-  - eingebettete Tokenizer: 'llama' (SentencePiece) und 'gpt2' (Byte-BPE)
+  Supports:
+  - GGUF versions 2 and 3
+  - tensor types F32, F16, Q4_0, Q4_1, Q8_0 (others -> requantize,
+    e.g. with llama-quantize to Q8_0/Q4_0)
+  - embedded tokenizers: 'llama' (SentencePiece) and 'gpt2' (byte BPE)
 
-  Alle Offsets/Groessen sind Int64 - Modelle mit Milliarden Parametern
-  und Dateien > 4 GB sind vollstaendig adressierbar. Der Stream bleibt
-  geoeffnet, damit Prism.Llama Tensoren lagenweise streamen kann. }
+  All offsets/sizes are Int64 - models with billions of parameters
+  and files > 4 GB are fully addressable. The stream stays open so
+  that Prism.Llama can stream tensors layer by layer. }
 
 interface
 
@@ -37,8 +37,8 @@ type
   TGgufTensorInfo = record
     Name: string;
     Typ: TGgmlType;
-    Dims: TArray<Int64>; // Dims[0] = Spalten (schnellste Dimension)
-    Offset: Int64;       // relativ zum Datenbereich
+    Dims: TArray<Int64>; // Dims[0] = columns (fastest dimension)
+    Offset: Int64;       // relative to the data section
     function Rows: Int64;
     function Cols: Int64;
   end;
@@ -63,9 +63,9 @@ type
     property Path: string read FPath;
     function HasTensor(const Name: string): Boolean;
     function TensorInfo(const Name: string): TGgufTensorInfo;
-    { Tensor (roh/quantisiert) laden - threadsicher }
+    { Load a tensor (raw/quantized) - thread-safe }
     function LoadTensor(const Name: string): TQTensor;
-    { Tensor nach F32 dequantisieren (fuer Norm-Gewichte, Biases) }
+    { Dequantize a tensor to F32 (for norm weights, biases) }
     function LoadTensorF32(const Name: string): TArray<Single>;
     function MetaInt(const Key: string; Def: Int64): Int64;
     function MetaFloat(const Key: string; Def: Double): Double;
@@ -77,7 +77,7 @@ type
     function HasKey(const Key: string): Boolean;
   end;
 
-  { Basis fuer GGUF-Tokenizer: gemeinsame Chat-Template-Logik }
+  { Base class for GGUF tokenizers: shared chat-template logic }
   TGgufTokenizerBase = class(TLlmTokenizerBase)
   protected
     FPieces: TArray<string>;
@@ -104,7 +104,7 @@ type
     property AutoTemplate: TChatTemplate read FAutoTemplate;
   end;
 
-  { SentencePiece-artiger Tokenizer (tokenizer.ggml.model = 'llama') }
+  { SentencePiece-style tokenizer (tokenizer.ggml.model = 'llama') }
   TSpmTokenizer = class(TGgufTokenizerBase)
   private
     FScores: TArray<Single>;
@@ -116,7 +116,7 @@ type
     function TokenBytes(Id: Integer): TBytes; override;
   end;
 
-  { GPT-2-Byte-BPE (tokenizer.ggml.model = 'gpt2', z.B. Qwen) }
+  { GPT-2 byte BPE (tokenizer.ggml.model = 'gpt2', e.g. Qwen) }
   TGpt2Tokenizer = class(TGgufTokenizerBase)
   private
     FMergeRank: TDictionary<string, Integer>;
@@ -186,10 +186,10 @@ begin
   FTensors := TDictionary<string, TGgufTensorInfo>.Create;
   FStream := TFileStream.Create(Path, fmOpenRead or fmShareDenyWrite);
   if ReadU32 <> GGUF_MAGIC then
-    raise Exception.Create('Keine GGUF-Datei: ' + Path);
+    raise Exception.Create('Not a GGUF file: ' + Path);
   Version := ReadU32;
   if (Version < 2) or (Version > 3) then
-    raise Exception.CreateFmt('GGUF-Version %d nicht unterstuetzt (nur 2/3).',
+    raise Exception.CreateFmt('GGUF version %d not supported (only 2/3).',
       [Version]);
   TensorCount := ReadU64;
   KvCount := ReadU64;
@@ -214,16 +214,16 @@ begin
       3: Info.Typ := gtQ4_1;
       8: Info.Typ := gtQ8_0;
     else
-      Info.Typ := TGgmlType(-1); // beim Laden abgelehnt, Metadaten ok
+      Info.Typ := TGgmlType(-1); // rejected on load, metadata is fine
     end;
     Info.Offset := Int64(ReadU64);
-    { Nicht unterstuetzte Typen bleiben registriert (Typ = -1);
-      die hilfreiche Fehlermeldung kommt erst beim Laden des Tensors. }
+    { Unsupported types stay registered (Typ = -1); the helpful error
+      message is only raised when the tensor is actually loaded. }
     FTensors.AddOrSetValue(Info.Name, Info);
   end;
   Alignment := MetaInt('general.alignment', 32);
   FDataOffset := AlignUp(FStream.Position, Alignment);
-  FArch := MetaStr('general.architecture', 'unbekannt');
+  FArch := MetaStr('general.architecture', 'unknown');
 end;
 
 destructor TGgufFile.Destroy;
@@ -254,7 +254,7 @@ begin
   if Len = 0 then
     Exit('');
   if Len > 128 * 1024 * 1024 then
-    raise Exception.Create('GGUF: String zu lang (Datei defekt?)');
+    raise Exception.Create('GGUF: string too long (file corrupt?)');
   SetLength(B, Len);
   FStream.ReadBuffer(B[0], Len);
   Result := TEncoding.UTF8.GetString(B);
@@ -342,7 +342,7 @@ begin
         end;
       end;
   else
-    raise Exception.CreateFmt('GGUF: unbekannter Werttyp %d', [Typ]);
+    raise Exception.CreateFmt('GGUF: unknown value type %d', [Typ]);
   end;
 end;
 
@@ -431,7 +431,7 @@ end;
 function TGgufFile.TensorInfo(const Name: string): TGgufTensorInfo;
 begin
   if not FTensors.TryGetValue(Name, Result) then
-    raise Exception.Create('GGUF: Tensor fehlt: ' + Name);
+    raise Exception.Create('GGUF: missing tensor: ' + Name);
 end;
 
 function TGgufFile.LoadTensor(const Name: string): TQTensor;
@@ -442,11 +442,11 @@ begin
   Info := TensorInfo(Name);
   if Integer(Info.Typ) = -1 then
     raise Exception.CreateFmt(
-      'GGUF: Tensor "%s" hat einen nicht unterstuetzten Typ. ' +
-      'Bitte Modell nach Q8_0, Q4_0 oder F16 requantisieren ' +
+      'GGUF: tensor "%s" has an unsupported type. ' +
+      'Please requantize the model to Q8_0, Q4_0 or F16 ' +
       '(llama-quantize model.gguf out.gguf Q8_0).', [Name]);
   if (Info.Rows > High(Integer)) or (Info.Cols > High(Integer)) then
-    raise Exception.Create('GGUF: Tensordimension > 2^31: ' + Name);
+    raise Exception.Create('GGUF: tensor dimension > 2^31: ' + Name);
   Result.Typ := Info.Typ;
   Result.Rows := Integer(Info.Rows);
   Result.Cols := Integer(Info.Cols);
@@ -484,7 +484,7 @@ begin
   FVocab := TDictionary<string, Integer>.Create;
   FPieces := Gg.MetaStrArr('tokenizer.ggml.tokens');
   if Length(FPieces) = 0 then
-    raise Exception.Create('GGUF: tokenizer.ggml.tokens fehlt.');
+    raise Exception.Create('GGUF: tokenizer.ggml.tokens missing.');
   TypesArr := Gg.MetaIntArr('tokenizer.ggml.token_type');
   SetLength(FTypes, Length(FPieces));
   for I := 0 to High(FPieces) do
@@ -624,7 +624,7 @@ begin
           T := T + '[INST] ' + UserBuf + ' [/INST]';
         AppendText(T);
       end;
-  else // ctPlain und alles andere
+  else // ctPlain and everything else
     begin
       T := '';
       for M in Msgs do
@@ -679,8 +679,8 @@ end;
 function TSpmTokenizer.Encode(const Text: string): TArray<Integer>;
 var
   S: string;
-  Syms: TList<Integer>;       // Token-Ids der aktuellen Symbolfolge
-  Pieces: TList<string>;      // zugehoerige Strings
+  Syms: TList<Integer>;       // token ids of the current symbol sequence
+  Pieces: TList<string>;      // corresponding strings
   I, J, Id, BestI, MergedId: Integer;
   CP: string;
   BestScore: Single;
@@ -695,7 +695,7 @@ begin
       S := ' ' + S;
     S := StringReplace(S, ' ', #$2581, [rfReplaceAll]);
 
-    { Startzustand: ein Symbol pro Codepoint, Byte-Fallback fuer Unbekanntes }
+    { Initial state: one symbol per codepoint, byte fallback for unknowns }
     I := 1;
     while I <= Length(S) do
     begin
@@ -727,7 +727,7 @@ begin
       end;
     end;
 
-    { Greedy-Merge nach Score (SentencePiece-BPE) }
+    { Greedy merge by score (SentencePiece BPE) }
     while Syms.Count > 1 do
     begin
       BestI := -1;
@@ -796,8 +796,8 @@ begin
   Merges := Gg.MetaStrArr('tokenizer.ggml.merges');
   for I := 0 to High(Merges) do
     FMergeRank.AddOrSetValue(Merges[I], I);
-  { GPT-2 bytes_to_unicode: druckbare Bytes bleiben, Rest wird ab U+0100
-    durchnummeriert }
+  { GPT-2 bytes_to_unicode: printable bytes stay as-is, the rest is
+    numbered consecutively starting at U+0100 }
   N := 0;
   for B := 0 to 255 do
   begin
@@ -836,7 +836,7 @@ begin
   try
     for I := 0 to High(Utf8) do
       Syms.Add(FByteToChar[Utf8[I]]);
-    { Merges nach Rang anwenden }
+    { Apply merges by rank }
     while Syms.Count > 1 do
     begin
       BestI := -1;
@@ -860,7 +860,7 @@ begin
         Res.Add(Id)
       else
       begin
-        { Symbol nicht im Vokabular -> in Einzelzeichen zerlegen }
+        { Symbol not in vocabulary -> split into single characters }
         SB.Clear;
         SB.Append(Syms[I]);
         for R := 0 to SB.Length - 1 do
@@ -898,8 +898,8 @@ var
   CurCat: Integer;
   Chunk: string;
 begin
-  { Vereinfachter GPT-2-Pretokenizer: an Kategorie-Grenzen splitten,
-    fuehrendes Leerzeichen klebt am Folgewort (" word"-Konvention). }
+  { Simplified GPT-2 pretokenizer: split at category boundaries, a
+    leading space sticks to the following word (" word" convention). }
   Res := TList<Integer>.Create;
   try
     I := 1;
@@ -907,14 +907,14 @@ begin
     begin
       Start := I;
       if (Text[I] = ' ') and (I < Length(Text)) and (Text[I + 1] <> ' ') then
-        Inc(I); // Leerzeichen dem naechsten Chunk zuschlagen
+        Inc(I); // attach the space to the next chunk
       if I <= Length(Text) then
       begin
         CurCat := Cat(Text[I]);
         while (I <= Length(Text)) and (Cat(Text[I]) = CurCat) and
           (Text[I] <> ' ') do
           Inc(I);
-        if (CurCat = 2) then // reine Leerzeichen-Folge
+        if (CurCat = 2) then // run of spaces only
           while (I <= Length(Text)) and (Text[I] = ' ') do
             Inc(I);
       end;
@@ -948,7 +948,7 @@ begin
     end
     else
     begin
-      { Zeichen ausserhalb der Byte-Map: als UTF-8 uebernehmen }
+      { Character outside the byte map: take it over as UTF-8 }
       var Enc := TEncoding.UTF8.GetBytes(string(P[I]));
       Move(Enc[0], Result[N], Length(Enc));
       Inc(N, Length(Enc));
@@ -966,7 +966,7 @@ begin
   else if SameText(Model, 'llama') then
     Result := TSpmTokenizer.Create(Gg)
   else
-    raise Exception.CreateFmt('GGUF: Tokenizer-Modell "%s" nicht unterstuetzt ' +
+    raise Exception.CreateFmt('GGUF: tokenizer model "%s" not supported ' +
       '(llama/gpt2).', [Model]);
 end;
 

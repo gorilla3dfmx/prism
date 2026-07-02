@@ -1,14 +1,14 @@
 unit Prism.Inference;
 
-{ Token-fuer-Token-Inferenz fuer eigene Prism-Modelle (+ generischer
-  Generator/Sampler fuer ALLE Engines, auch GGUF/Llama).
+{ Token-by-token inference for native Prism models (+ generic
+  generator/sampler for ALL engines, including GGUF/Llama).
 
-  Effizienz-Massnahmen:
-  - KV-Cache: Attention rechnet nur gegen bereits gecachte Keys/Values
-  - Prefill ohne Logits: waehrend der Prompt eingelesen wird, entfaellt
-    die teure Vokabular-Projektion (V x C) komplett
-  - MoE-Routing: pro Token wird nur EIN FFN-Experte ("Areal") gerechnet
-  - grosse MatVecs laufen ueber das Compute-Backend (CPU-Threads/GPU) }
+  Efficiency measures:
+  - KV cache: attention only computes against already cached keys/values
+  - prefill without logits: while the prompt is being consumed, the
+    expensive vocabulary projection (V x C) is skipped entirely
+  - MoE routing: only ONE FFN expert ("area") is computed per token
+  - large MatVecs run through the compute backend (CPU threads/GPU) }
 
 {$POINTERMATH ON}
 
@@ -52,8 +52,8 @@ type
     function Position: Integer; override;
   end;
 
-  { Generator + Verifikations-Scoring; arbeitet gegen die Abstraktionen,
-    funktioniert also fuer Prism- UND GGUF-Modelle. }
+  { Generator + verification scoring; works against the abstractions,
+    so it handles both Prism AND GGUF models. }
   TGenerator = class
   private
     FBackend: TLlmBackend;
@@ -64,16 +64,16 @@ type
     constructor Create(ABackend: TLlmBackend);
     destructor Destroy; override;
     property Engine: TLlmEngine read FEngine;
-    { Generiert Text; OnToken (optional) erhaelt dekodierte UTF-8-Stuecke }
+    { Generates text; OnToken (optional) receives decoded UTF-8 pieces }
     function Generate(const PromptTokens: TArray<Integer>;
       const SP: TSamplingParams; const OnToken: TProc<string>;
       out Usage: TUsage; OutTokens: TList<Integer> = nil): string;
-    { Summe ln P(cont | ctx) - Basis fuer Perplexitaet/Critic-Score }
+    { Sum of ln P(cont | ctx) - basis for perplexity/critic score }
     function ScoreContinuation(const Ctx, Cont: TArray<Integer>): Double;
     function Perplexity(const Ctx, Cont: TArray<Integer>): Double;
   end;
 
-  { Backend fuer eigene .prism-Modelle }
+  { Backend for native .prism models }
   TPrismBackend = class(TLlmBackend)
   private
     FProv: TWeightsProvider;
@@ -233,9 +233,9 @@ var
   Gate: Single;
 begin
   if FPos >= FProv.Config.SeqLen then
-    raise Exception.Create('Kontextfenster erschoepft.');
+    raise Exception.Create('Context window exhausted.');
   if (Token < 0) or (Token >= FProv.Config.VocabSize) then
-    raise Exception.CreateFmt('Ungueltiges Token %d', [Token]);
+    raise Exception.CreateFmt('Invalid token %d', [Token]);
   Lay := FProv.Layout;
   C := FProv.Config.Dim;
   Res := FProv.Resident;
@@ -248,7 +248,7 @@ begin
   for L := 0 to FProv.Config.NumLayers - 1 do
   begin
     FProv.GetLayer(L, Arr, Base);
-    { Attention-Block }
+    { Attention block }
     LayerNormVec(@FXn[0], @FX[0], PSingle(@Arr[0]) + Base + Lay.RLn1W,
       PSingle(@Arr[0]) + Base + Lay.RLn1B, C, 1e-5);
     Backend.MatVecF32W(@FQkv[0], PSingle(@Arr[0]) + Base + Lay.RQkvW,
@@ -262,7 +262,7 @@ begin
       Pointer(Arr), Base + Lay.RProjW);
     AddVec(@FX[0], @FXn[0], C);
 
-    { FFN-Block: dicht oder Mixture-of-Experts (Top-1-Routing) }
+    { FFN block: dense or mixture-of-experts (top-1 routing) }
     LayerNormVec(@FXn[0], @FX[0], PSingle(@Arr[0]) + Base + Lay.RLn2W,
       PSingle(@Arr[0]) + Base + Lay.RLn2B, C, 1e-5);
     if FProv.Config.IsMoE then
@@ -386,7 +386,7 @@ begin
   Prompt := PromptTokens;
   if Length(Prompt) = 0 then
     Prompt := [FBackend.Tokenizer.BosId];
-  { Prompt notfalls links kuerzen (Kontextfenster) }
+  { Truncate the prompt on the left if necessary (context window) }
   KeepLen := MaxCtx - Max(16, Min(SP.MaxTokens, MaxCtx div 4));
   if Length(Prompt) > KeepLen then
     Prompt := Copy(Prompt, Length(Prompt) - KeepLen, KeepLen);
@@ -395,7 +395,7 @@ begin
   Usage.CompletionTokens := 0;
 
   FEngine.Reset;
-  { Prefill: Logits nur fuer das letzte Prompt-Token berechnen }
+  { Prefill: compute logits only for the last prompt token }
   for I := 0 to High(Prompt) - 1 do
     FEngine.Step(Prompt[I], False);
   FEngine.Step(Prompt[High(Prompt)], True);

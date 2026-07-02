@@ -1,13 +1,13 @@
 unit Prism.Types;
 
-{ Prism - Ein LLM-Framework in reinem Object Pascal (Delphi 13).
-  Basistypen, Konfiguration, Parameter-Layout, RNG und die abstrakten
-  Basisklassen fuer Engines/Tokenizer/Backends.
+{ Prism - An LLM framework in pure Object Pascal (Delphi 13).
+  Base types, configuration, parameter layout, RNG and the abstract
+  base classes for engines/tokenizers/backends.
 
-  WICHTIG: Alle Groessen/Offsets sind Int64-faehig (NativeInt auf 64-Bit),
-  damit Modelle mit Milliarden Parametern adressierbar sind.
-  Fuer grosse Modelle immer 64-Bit-Targets (Win64, Linux64, Android64,
-  iOS/macOS ARM64) kompilieren. }
+  IMPORTANT: All sizes/offsets are Int64-capable (NativeInt on 64-bit)
+  so that models with billions of parameters are addressable.
+  For large models always compile for 64-bit targets (Win64, Linux64,
+  Android64, iOS/macOS ARM64). }
 
 interface
 
@@ -17,54 +17,54 @@ uses
 const
   PRISM_VERSION = '0.1.0';
 
-  { Eigenes Checkpoint-Format (trainierbare Modelle) }
+  { Custom checkpoint format (trainable models) }
   CHECKPOINT_MAGIC: UInt32 = $4D535250; // 'PRSM' little-endian
   CHECKPOINT_VERSION = 1;
   CHECKPOINT_HEADER_SIZE = 64;
 
 type
-  { Konfiguration des eigenen (trainierbaren) GPT-2-artigen Modells.
-    NumExperts > 1 aktiviert Mixture-of-Experts ("thematische Areale"):
-    ein Router waehlt pro Token EINEN Experten (Top-1) - nur dieser
-    Untergraph wird gerechnet und muss im Speicher liegen. }
+  { Configuration of the custom (trainable) GPT-2-style model.
+    NumExperts > 1 enables Mixture-of-Experts ("topical areas"):
+    a router picks ONE expert per token (top-1) - only this subgraph
+    is computed and has to reside in memory. }
   TModelConfig = record
     VocabSize: Integer;
-    SeqLen: Integer;      // maximale Kontextlaenge
-    Dim: Integer;         // Embedding-Dimension C
+    SeqLen: Integer;      // maximum context length
+    Dim: Integer;         // embedding dimension C
     NumLayers: Integer;
     NumHeads: Integer;
-    NumExperts: Integer;  // 1 = klassisches dichtes FFN
-    function Hidden: Integer;   // MLP hidden = 4*C (pro Experte)
+    NumExperts: Integer;  // 1 = classic dense FFN
+    function Hidden: Integer;   // MLP hidden = 4*C (per expert)
     function HeadSize: Integer; // C div NumHeads
     function IsMoE: Boolean;
     function ToString: string;
   end;
 
-  { Flat-Layout aller Parameter. Reihenfolge:
+  { Flat layout of all parameters. Order:
     [wte][wpe][lnf_w][lnf_b][layer 0][layer 1]...[layer L-1]
-    Layer-Block: [core: ln1, qkv, proj, ln2, router][expert 0]...[expert E-1]
-    Der "Resident"-Prefix (Embeddings + finale Norm) bleibt beim Streaming
-    immer im Speicher; Layer-Cores und einzelne Experten werden als
-    Cluster bedarfsweise nachgeladen (LRU). }
+    Layer block: [core: ln1, qkv, proj, ln2, router][expert 0]...[expert E-1]
+    The "resident" prefix (embeddings + final norm) always stays in memory
+    during streaming; layer cores and individual experts are loaded on
+    demand as clusters (LRU). }
   TParamLayout = record
     Config: TModelConfig;
     OffWte, OffWpe, OffLnfW, OffLnfB: Int64;
-    ResidentCount: Int64;   // Anzahl Floats im Resident-Prefix
-    LayerCoreCount: Int64;  // Floats im Layer-Core (Attention + Router)
-    ExpertCount: Int64;     // Floats pro Experte (FFN)
+    ResidentCount: Int64;   // number of floats in the resident prefix
+    LayerCoreCount: Int64;  // floats in the layer core (attention + router)
+    ExpertCount: Int64;     // floats per expert (FFN)
     LayerCount: Int64;      // Core + NumExperts * ExpertCount
     TotalCount: Int64;
-    { Offsets INNERHALB des Layer-Cores (relativ zur Layer-Basis) }
+    { Offsets WITHIN the layer core (relative to the layer base) }
     RLn1W, RLn1B, RQkvW, RQkvB, RProjW, RProjB,
     RLn2W, RLn2B, RRouterW: Int64;
-    { Offsets INNERHALB eines Experten-Blocks (relativ zur Experten-Basis) }
+    { Offsets WITHIN an expert block (relative to the expert base) }
     XFcW, XFcB, XFc2W, XFc2B: Int64;
     procedure Init(const AConfig: TModelConfig);
     function LayerBase(L: Integer): Int64;
     function ExpertBase(L, E: Integer): Int64;
   end;
 
-  { Deterministischer RNG (xorshift64*), unabhaengig vom System-Random }
+  { Deterministic RNG (xorshift64*), independent of the system Random }
   TRng = record
     State: UInt64;
     procedure Seed(ASeed: UInt64);
@@ -83,8 +83,8 @@ type
 
   TChatTemplate = (ctAuto, ctPrism, ctChatML, ctLlama2, ctPlain);
 
-  { Abstrakter Tokenizer: implementiert von TTokenizer (eigenes Byte-BPE),
-    TSpmTokenizer und TGpt2Tokenizer (beide aus GGUF-Metadaten). }
+  { Abstract tokenizer: implemented by TTokenizer (custom byte-level BPE),
+    TSpmTokenizer and TGpt2Tokenizer (both built from GGUF metadata). }
   TLlmTokenizerBase = class
   public
     function VocabSize: Integer; virtual; abstract;
@@ -94,17 +94,17 @@ type
     function BosId: Integer; virtual; abstract;
     function EosId: Integer; virtual; abstract;
     function IsStopToken(Id: Integer): Boolean; virtual;
-    { True, wenn Roh-Prompts (completion/generate) ein BOS vorangestellt
-      werden soll (GGUF-Modelle erwarten das; Prism-Korpusformat nicht) }
+    { True if raw prompts (completion/generate) should be prefixed with a
+      BOS token (GGUF models expect this; the Prism corpus format does not) }
     function PrependBos: Boolean; virtual;
-    { Baut aus Chat-Nachrichten die Prompt-Token-Sequenz (inkl. Template) }
+    { Builds the prompt token sequence from chat messages (incl. template) }
     function BuildChatTokens(const Msgs: TChatMessages;
       Template: TChatTemplate): TArray<Integer>; virtual; abstract;
   end;
 
-  { Abstrakte Inferenz-Engine (ein Exemplar pro Request; haelt KV-Cache).
-    Step verarbeitet EIN Token; NeedLogits=False beim Prompt-Prefill spart
-    die teure Logits-Projektion (V x C) - wichtiger Performance-Gewinn. }
+  { Abstract inference engine (one instance per request; holds the KV cache).
+    Step processes ONE token; NeedLogits=False during prompt prefill skips
+    the expensive logits projection (V x C) - an important performance win. }
   TLlmEngine = class
   public
     procedure Reset; virtual; abstract;
@@ -115,7 +115,7 @@ type
     function Position: Integer; virtual; abstract;
   end;
 
-  { Backend = geladenes Modell + Tokenizer; Factory fuer Engines }
+  { Backend = loaded model + tokenizer; factory for engines }
   TLlmBackend = class
   public
     function CreateEngine: TLlmEngine; virtual; abstract;
@@ -172,7 +172,7 @@ begin
   OffLnfW := OffWpe + Int64(AConfig.SeqLen) * C;
   OffLnfB := OffLnfW + C;
   ResidentCount := OffLnfB + C;
-  { Layer-Core }
+  { Layer core }
   O := 0;
   RLn1W := O; Inc(O, C);
   RLn1B := O; Inc(O, C);
@@ -184,9 +184,9 @@ begin
   RLn2B := O; Inc(O, C);
   RRouterW := O;
   if E > 1 then
-    Inc(O, E * C); // Router nur bei MoE
+    Inc(O, E * C); // router only for MoE
   LayerCoreCount := O;
-  { Experten-Block }
+  { Expert block }
   O := 0;
   XFcW := O; Inc(O, H * C);
   XFcB := O; Inc(O, H);
@@ -309,8 +309,8 @@ begin
   end;
 end;
 
-{ Laenge des laengsten Prefix, das nur VOLLSTAENDIGE UTF-8-Sequenzen enthaelt.
-  Wird beim Token-Streaming genutzt, um keine halben Zeichen zu senden. }
+{ Length of the longest prefix that contains only COMPLETE UTF-8 sequences.
+  Used during token streaming to avoid sending partial characters. }
 function Utf8CompletePrefixLength(const B: TBytes): Integer;
 var
   N, I, Need: Integer;
@@ -320,7 +320,7 @@ begin
   if N = 0 then
     Exit(0);
   I := N - 1;
-  { Rueckwaerts das letzte Lead-Byte suchen (max. 3 Continuation-Bytes) }
+  { Scan backwards for the last lead byte (at most 3 continuation bytes) }
   while (I > 0) and (I > N - 4) and ((B[I] and $C0) = $80) do
     Dec(I);
   Lead := B[I];
@@ -333,7 +333,7 @@ begin
   else if (Lead and $F8) = $F0 then
     Need := 4
   else
-    Need := 1; // ungueltig -> als komplett behandeln
+    Need := 1; // invalid -> treat as complete
   if I + Need <= N then
     Result := N
   else

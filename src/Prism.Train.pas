@@ -1,17 +1,17 @@
 unit Prism.Train;
 
-{ Training eigener Prism-Modelle: vollstaendiger Forward/Backward-Pass
-  (Port der llm.c-GPT-2-Mathematik) + AdamW-Optimizer.
+{ Training of custom Prism models: full forward/backward pass
+  (port of the llm.c GPT-2 math) + AdamW optimizer.
 
-  MoE-Erweiterung ("thematische Areale"): bei NumExperts > 1 waehlt ein
-  Router pro Token einen Experten (Top-1). Im Backward-Pass fliessen
-  Gradienten nur durch den gewaehlten Experten sowie ueber den Gate-Wert
-  in den Router (Softmax-Backprop). So spezialisieren sich die Areale
-  waehrend des Trainings von selbst.
+  MoE extension ("thematic areas"): when NumExperts > 1, a router
+  selects one expert per token (top-1). In the backward pass,
+  gradients flow only through the selected expert as well as through
+  the gate value into the router (softmax backprop). This way the areas
+  specialize on their own during training.
 
-  TTrainingService: Hintergrund-Thread fuer Online-Finetuning ueber die
-  REST-Schnittstelle (Samples werden angehaengt, N Schritte trainiert,
-  Checkpoint gespeichert). }
+  TTrainingService: background thread for online finetuning via the
+  REST interface (samples are appended, N steps trained,
+  checkpoint saved). }
 
 {$POINTERMATH ON}
 
@@ -42,7 +42,7 @@ type
     FB, FT: Integer;
     FActs, FGActs: TArray<Single>;
     AL: TActLayout;
-    FExpertIdx: TArray<Integer>; // [L*B*T] gewaehlter Experte
+    FExpertIdx: TArray<Integer>; // [L*B*T] selected expert
     FInputs, FTargets: TArray<Integer>;
     FStep: Integer;
     function PP(Off: Int64): PSingle; inline;  // Params
@@ -63,13 +63,13 @@ type
     property SeqLen: Integer read FT;
   end;
 
-  { Hintergrund-Finetuning fuer den REST-Server (nur Full-Memory-Modus) }
+  { Background finetuning for the REST server (full-memory mode only) }
   TTrainingService = class(TThread)
   private
     FTrainer: TTrainer;
     FW: TFullWeights;
     FTok: TTokenizer;
-    FSharedLock: TCriticalSection; // blockiert Inferenz waehrend Updates
+    FSharedLock: TCriticalSection; // blocks inference during updates
     FQueue: TThreadedQueue<TBytes>;
     FTokens: TList<Integer>;
     FModelPath: string;
@@ -217,7 +217,7 @@ var
 begin
   StartMax := Length(Tokens) - FT - 1;
   if StartMax < 0 then
-    raise Exception.Create('Trainingsdaten kuerzer als die Sequenzlaenge.');
+    raise Exception.Create('Training data shorter than the sequence length.');
   for BI := 0 to FB - 1 do
   begin
     S := Rng.NextInt(StartMax + 1);
@@ -287,8 +287,8 @@ begin
   SetLength(TmpDGelu, AL.H);
   SetLength(TmpDFch, AL.H);
   SetLength(TmpDLogit, AL.E);
-  { seriell: mehrere Tokens koennen denselben Experten treffen ->
-    Gradienten-Akkumulation darf nicht parallel laufen }
+  { serial: multiple tokens can hit the same expert ->
+    gradient accumulation must not run in parallel }
   for BTI := 0 to Integer(BT) - 1 do
   begin
     EIdx := FExpertIdx[Int64(L) * BT + BTI];
@@ -312,7 +312,7 @@ begin
       DGate := DGate + DRes3[I] * OP[I];
     end;
 
-    { durch fc2: dGelu = W2^T * dO; dW2 += dO x Gelu; dB2 += dO }
+    { through fc2: dGelu = W2^T * dO; dW2 += dO x Gelu; dB2 += dO }
     FillVec(@TmpDGelu[0], 0, AL.H);
     for I := 0 to AL.C - 1 do
     begin
@@ -329,11 +329,11 @@ begin
       end;
     end;
 
-    { GELU-Backward }
+    { GELU backward }
     FillVec(@TmpDFch[0], 0, AL.H);
     GeluBackward(@TmpDFch[0], FchP, @TmpDGelu[0], AL.H);
 
-    { durch fc1: dLn2 += W1^T * dFch; dW1 += dFch x X; dB1 += dFch }
+    { through fc1: dLn2 += W1^T * dFch; dW1 += dFch x X; dB1 += dFch }
     for J := 0 to AL.H - 1 do
     begin
       D := TmpDFch[J];
@@ -349,7 +349,7 @@ begin
       end;
     end;
 
-    { Router: gate = softmax(logits)[e] -> Softmax-Backprop nur ueber dGate }
+    { Router: gate = softmax(logits)[e] -> softmax backprop only via dGate }
     for K := 0 to AL.E - 1 do
     begin
       if K = EIdx then
@@ -620,13 +620,13 @@ begin
       FTokens.AddRange(NewTokens);
       MinLen := FTrainer.SeqLen + 2;
       while (FTokens.Count > 0) and (FTokens.Count < MinLen) do
-        FTokens.AddRange(NewTokens); // kleines Sample auffuellen
+        FTokens.AddRange(NewTokens); // pad out a small sample
       if FTokens.Count < MinLen then
         Continue;
       Loss := 0;
       for S := 1 to StepsPerJob do
       begin
-        FSharedLock.Enter; // Inferenz pausiert waehrend des Updates
+        FSharedLock.Enter; // inference is paused during the update
         try
           Loss := FTrainer.TrainStep(FTokens.ToArray, FRng, LearnRate, 0.0);
         finally
@@ -642,12 +642,12 @@ begin
         FSharedLock.Leave;
       end;
       if Assigned(FLog) then
-        FLog(Format('Online-Training: %d Schritte, Loss %.4f, Korpus %d Tokens',
+        FLog(Format('Online training: %d steps, loss %.4f, corpus %d tokens',
           [StepsPerJob, Loss, FTokens.Count]));
     except
       on E: Exception do
         if Assigned(FLog) then
-          FLog('Online-Training-Fehler: ' + E.Message);
+          FLog('Online training error: ' + E.Message);
     end;
   end;
 end;

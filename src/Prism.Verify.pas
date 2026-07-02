@@ -1,18 +1,18 @@
 unit Prism.Verify;
 
-{ Integrierte Selbst-Verifikation der generierten Antworten.
-  Drei unabhaengige Signale werden kombiniert:
+{ Integrated self-verification of the generated answers.
+  Three independent signals are combined:
 
-  1. Perplexitaet: Wie "sicher" war das Modell bei seiner eigenen Antwort?
-     (Teacher-Forcing-Rescoring der Antwort unter dem Prompt)
-  2. Selbstkonsistenz: K alternative Antworten werden gesampelt und mit
-     der Antwort verglichen (Jaccard-Aehnlichkeit ueber Token-Bigramme).
-     Stabile Antworten = hohe Konsistenz.
-  3. Critic-Pass: Das Modell wird gefragt, ob die Antwort korrekt ist,
-     und die Wahrscheinlichkeiten von "ja" vs. "nein" werden verglichen.
+  1. Perplexity: How "confident" was the model in its own answer?
+     (teacher-forcing rescoring of the answer under the prompt)
+  2. Self-consistency: K alternative answers are sampled and compared
+     with the answer (Jaccard similarity over token bigrams).
+     Stable answers = high consistency.
+  3. Critic pass: The model is asked whether the answer is correct,
+     and the probabilities of "yes" vs. "no" are compared.
 
-  Ergebnis: pass / warn / fail + Rohwerte (im REST-Response-Feld
-  "x_verification"). Schwellwerte sind konfigurierbar. }
+  Result: pass / warn / fail + raw values (in the REST response field
+  "x_verification"). Thresholds are configurable. }
 
 interface
 
@@ -24,7 +24,7 @@ type
   TVerificationResult = record
     Perplexity: Double;
     SelfConsistency: Double; // 0..1
-    CriticScore: Double;     // 0..1 (P("ja"))
+    CriticScore: Double;     // 0..1 (P("yes"))
     Verdict: string;         // 'pass' | 'warn' | 'fail'
     function ToJson: TJSONObject;
   end;
@@ -34,8 +34,8 @@ type
     FBackend: TLlmBackend;
     function BigramSimilarity(const A, B: TArray<Integer>): Double;
   public
-    PplWarn: Double;   // Perplexitaet ueber diesem Wert -> warn
-    PplFail: Double;   // Perplexitaet ueber diesem Wert -> fail
+    PplWarn: Double;   // perplexity above this value -> warn
+    PplFail: Double;   // perplexity above this value -> fail
     MinConsistency: Double;
     MinCritic: Double;
     constructor Create(ABackend: TLlmBackend);
@@ -110,11 +110,11 @@ function TVerifier.Verify(const PromptTokens: TArray<Integer>;
 var
   Gen: TGenerator;
   Tok: TLlmTokenizerBase;
-  AnswerTokens, CriticTokens, JaTok, NeinTok: TArray<Integer>;
+  AnswerTokens, CriticTokens, YesTok, NoTok: TArray<Integer>;
   SP: TSamplingParams;
   Usage: TUsage;
   AltTokens: TList<Integer>;
-  SimSum, LpJa, LpNein: Double;
+  SimSum, LpYes, LpNo: Double;
   S: Integer;
   Msgs: TChatMessages;
 begin
@@ -126,11 +126,11 @@ begin
 
   Gen := TGenerator.Create(FBackend);
   try
-    { 1. Perplexitaet der eigenen Antwort }
+    { 1. Perplexity of the model's own answer }
     if Length(AnswerTokens) > 0 then
       Result.Perplexity := Gen.Perplexity(PromptTokens, AnswerTokens);
 
-    { 2. Selbstkonsistenz ueber alternative Samples }
+    { 2. Self-consistency over alternative samples }
     if Samples > 0 then
     begin
       SP := TSamplingParams.Default;
@@ -151,21 +151,21 @@ begin
       Result.SelfConsistency := SimSum / Samples;
     end;
 
-    { 3. Critic-Pass: P("ja") vs. P("nein") }
+    { 3. Critic pass: P("yes") vs. P("no") }
     SetLength(Msgs, 1);
     Msgs[0] := TChatMessage.Make('user',
-      'Pruefe die folgende Antwort.'#10 +
-      'Frage: ' + UserText + #10 +
-      'Antwort: ' + AnswerText + #10 +
-      'Ist die Antwort korrekt und konsistent? Antworte nur mit ja oder nein.');
+      'Check the following answer.'#10 +
+      'Question: ' + UserText + #10 +
+      'Answer: ' + AnswerText + #10 +
+      'Is the answer correct and consistent? Reply with yes or no only.');
     CriticTokens := Tok.BuildChatTokens(Msgs, FBackend.DefaultTemplate);
-    JaTok := Tok.Encode('ja');
-    NeinTok := Tok.Encode('nein');
-    if (Length(JaTok) > 0) and (Length(NeinTok) > 0) then
+    YesTok := Tok.Encode('yes');
+    NoTok := Tok.Encode('no');
+    if (Length(YesTok) > 0) and (Length(NoTok) > 0) then
     begin
-      LpJa := Gen.ScoreContinuation(CriticTokens, JaTok) / Length(JaTok);
-      LpNein := Gen.ScoreContinuation(CriticTokens, NeinTok) / Length(NeinTok);
-      Result.CriticScore := Exp(LpJa) / Max(1e-12, Exp(LpJa) + Exp(LpNein));
+      LpYes := Gen.ScoreContinuation(CriticTokens, YesTok) / Length(YesTok);
+      LpNo := Gen.ScoreContinuation(CriticTokens, NoTok) / Length(NoTok);
+      Result.CriticScore := Exp(LpYes) / Max(1e-12, Exp(LpYes) + Exp(LpNo));
     end;
   finally
     Gen.Free;

@@ -1,8 +1,8 @@
 program PrismMobile;
 
-{ Prism Mobile - lokaler LLM-Server als FMX-App (Android/iOS/Win/macOS).
-  Projekt in der IDE oeffnen, Zielplattform waehlen (z.B. Android 64-Bit),
-  Modell-Dateien im Deployment-Manager hinterlegen, deployen. }
+{ Prism Mobile - local LLM server as an FMX app (Android/iOS/Win/macOS).
+  Open the project in the IDE, choose the target platform (e.g. Android 64-bit),
+  add the model files in the Deployment Manager, then deploy. }
 
 uses
   System.StartUpCopy,

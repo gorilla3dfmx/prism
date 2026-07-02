@@ -1,16 +1,16 @@
 unit MainFormU;
 
-{ Prism Mobile: startet den Prism-LLM-Server lokal auf dem Geraet (FMX,
-  Android/iOS/Windows/macOS). Die UI wird zur Laufzeit aufgebaut, damit
-  die .fmx-Datei minimal bleibt.
+{ Prism Mobile: starts the Prism LLM server locally on the device (FMX,
+  Android/iOS/Windows/macOS). The UI is built at runtime so that the
+  .fmx file stays minimal.
 
-  Modell-Deployment:
-  - Android/iOS: model.prism + tokenizer.json (oder model.gguf) ueber den
-    Deployment-Manager in das Dokumente-Verzeichnis der App legen
-    (TPath.GetDocumentsPath), Remote-Pfad ".\" bzw. "StartUp\Documents".
-  - Android braucht die Berechtigung INTERNET (Projektoptionen).
-  - Fuer Milliarden-Parameter-GGUF-Modelle --stream-layers nutzen
-    (Schieberegler "Layer-Cache"). }
+  Model deployment:
+  - Android/iOS: place model.prism + tokenizer.json (or model.gguf) into
+    the app's documents directory via the Deployment Manager
+    (TPath.GetDocumentsPath), remote path ".\" or "StartUp\Documents".
+  - Android requires the INTERNET permission (project options).
+  - For billion-parameter GGUF models use --stream-layers
+    (the "Layer-Cache" slider). }
 
 interface
 
@@ -56,7 +56,7 @@ begin
   FTitle.Parent := FToolbar;
   FTitle.Align := TAlignLayout.Client;
   FTitle.TextSettings.HorzAlign := TTextAlign.Center;
-  FTitle.Text := 'Prism ' + PRISM_VERSION + ' - lokaler LLM-Server';
+  FTitle.Text := 'Prism ' + PRISM_VERSION + ' - local LLM server';
 
   FBottom := TLayout.Create(Self);
   FBottom.Parent := Self;
@@ -83,7 +83,7 @@ begin
   FStartBtn.Parent := FBottom;
   FStartBtn.Align := TAlignLayout.Client;
   FStartBtn.Margins.Left := 8;
-  FStartBtn.Text := 'Server starten';
+  FStartBtn.Text := 'Start server';
   FStartBtn.OnClick := StartStopClick;
 
   FMemo := TMemo.Create(Self);
@@ -92,9 +92,9 @@ begin
   FMemo.ReadOnly := True;
   FMemo.TextSettings.Font.Family := 'Consolas';
 
-  AddLog('Bereit. Modell in das Dokumente-Verzeichnis legen:');
+  AddLog('Ready. Place the model in the documents directory:');
   AddLog('  ' + TPath.GetDocumentsPath);
-  AddLog('Gesucht wird: model.prism + tokenizer.json oder *.gguf');
+  AddLog('Looking for: model.prism + tokenizer.json or *.gguf');
 end;
 
 procedure TMainForm.FormDestroy(Sender: TObject);
@@ -149,17 +149,17 @@ begin
   if FServer <> nil then
   begin
     FreeAndNil(FServer);
-    FStartBtn.Text := 'Server starten';
-    AddLog('Server gestoppt.');
+    FStartBtn.Text := 'Start server';
+    AddLog('Server stopped.');
     Exit;
   end;
   if not FindModelFile(ModelPath, TokPath) then
   begin
-    AddLog('FEHLER: kein Modell gefunden in ' + TPath.GetDocumentsPath);
+    AddLog('ERROR: no model found in ' + TPath.GetDocumentsPath);
     Exit;
   end;
   FStartBtn.Enabled := False;
-  AddLog('Lade Modell (bitte warten) ...');
+  AddLog('Loading model (please wait) ...');
   TThread.CreateAnonymousThread(
     procedure
     var
@@ -171,7 +171,7 @@ begin
         Opts.TokenizerPath := TokPath;
         Opts.Port := StrToIntDef(FPortEdit.Text, 11434);
         Opts.StreamLayers := StrToIntDef(FStreamEdit.Text, 4);
-        Opts.CtxOverride := 1024; // KV-Cache auf Mobilgeraeten begrenzen
+        Opts.CtxOverride := 1024; // limit the KV cache on mobile devices
         Opts.CorpusPath := TPath.Combine(TPath.GetDocumentsPath, 'corpus.bin');
         Srv := TPrismRestServer.Create(Opts,
           procedure(S: string)
@@ -183,13 +183,13 @@ begin
           procedure
           begin
             FServer := Srv;
-            FStartBtn.Text := 'Server stoppen';
+            FStartBtn.Text := 'Stop server';
             FStartBtn.Enabled := True;
           end);
       except
         on E: Exception do
         begin
-          AddLog('FEHLER: ' + E.Message);
+          AddLog('ERROR: ' + E.Message);
           TThread.Queue(nil,
             procedure
             begin
