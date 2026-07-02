@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{1025EA5C-DFC2-4C11-8407-64D37B92DC89}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="PrismServer.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="PrismTrain.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="PrismServer">
+        <MSBuild Projects="PrismServer.dproj"/>
+    </Target>
+    <Target Name="PrismServer:Clean">
+        <MSBuild Projects="PrismServer.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="PrismServer:Make">
+        <MSBuild Projects="PrismServer.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="PrismTrain">
+        <MSBuild Projects="PrismTrain.dproj"/>
+    </Target>
+    <Target Name="PrismTrain:Clean">
+        <MSBuild Projects="PrismTrain.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="PrismTrain:Make">
+        <MSBuild Projects="PrismTrain.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="PrismServer;PrismTrain"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="PrismServer:Clean;PrismTrain:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="PrismServer:Make;PrismTrain:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

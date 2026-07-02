@@ -213,6 +213,9 @@ begin
       2: Info.Typ := gtQ4_0;
       3: Info.Typ := gtQ4_1;
       8: Info.Typ := gtQ8_0;
+      12: Info.Typ := gtQ4_K;
+      13: Info.Typ := gtQ5_K;
+      14: Info.Typ := gtQ6_K;
     else
       Info.Typ := TGgmlType(-1); // rejected on load, metadata is fine
     end;
@@ -443,8 +446,9 @@ begin
   if Integer(Info.Typ) = -1 then
     raise Exception.CreateFmt(
       'GGUF: tensor "%s" has an unsupported type. ' +
-      'Please requantize the model to Q8_0, Q4_0 or F16 ' +
-      '(llama-quantize model.gguf out.gguf Q8_0).', [Name]);
+      'Supported: F32, F16, Q8_0, Q4_0, Q4_1, Q4_K, Q5_K, Q6_K. ' +
+      'Please requantize the model (e.g. llama-quantize model.gguf out.gguf Q4_K_M).',
+      [Name]);
   if (Info.Rows > High(Integer)) or (Info.Cols > High(Integer)) then
     raise Exception.Create('GGUF: tensor dimension > 2^31: ' + Name);
   Result.Typ := Info.Typ;

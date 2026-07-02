@@ -23,11 +23,13 @@ uses
   System.SysUtils, System.Math, System.Threading;
 
 const
-  QK = 32; // block size of all supported GGML quantizations
+  QK = 32;    // block size of the legacy GGML quantizations (Q4_0/Q4_1/Q8_0)
+  QK_K = 256; // super-block size of the K-quantizations (Q4_K/Q5_K/Q6_K)
 
 type
   { GGML tensor types (subset), values = GGUF/GGML enum }
-  TGgmlType = (gtF32 = 0, gtF16 = 1, gtQ4_0 = 2, gtQ4_1 = 3, gtQ8_0 = 8);
+  TGgmlType = (gtF32 = 0, gtF16 = 1, gtQ4_0 = 2, gtQ4_1 = 3, gtQ8_0 = 8,
+    gtQ4_K = 12, gtQ5_K = 13, gtQ6_K = 14);
 
   { Quantized (or F32/F16) 2D tensor, stored row by row.
     Rows/Cols individually < 2^31, total size Int64. }
@@ -102,7 +104,7 @@ begin
     end;
   end
   else
-    Bits := Sign or ((Exp - 15 + 127) shl 23) or (Mant shl 13);
+    Bits := Sign or (((Exp + 127) - 15) shl 23) or (Mant shl 13);
   Move(Bits, Result, 4);
 end;
 
@@ -424,6 +426,187 @@ begin
   Result := Acc;
 end;
 
+{ ---------- K-quantizations (super-block = 256 values) ----------
+  Way A: dequantize each super-block to F32 on the fly, then reuse DotF32.
+  Bit layouts follow llama.cpp/ggml-quants.c (new QK_K = 256 format). }
+
+{ Q4_K/Q5_K sub-block scale+min: 6-bit values packed into 12 bytes }
+procedure GetScaleMinK4(J: Integer; Q: PByte; out D, M: Byte);
+begin
+  if J < 4 then
+  begin
+    D := Q[J] and 63;
+    M := Q[J + 4] and 63;
+  end
+  else
+  begin
+    D := (Q[J + 4] and $0F) or ((Q[J - 4] shr 6) shl 4);
+    M := (Q[J + 4] shr 4) or ((Q[J] shr 6) shl 4);
+  end;
+end;
+
+{ Q4_K super-block: d,dmin (F16) + 12 scale bytes + 128 quant bytes = 144 B }
+procedure DequantSuperQ4_K(P: PByte; Dst: PSingle);
+var
+  D, Dmin, D1, D2, M1, M2: Single;
+  Scales, Q: PByte;
+  J, L, Is_, YBase: Integer;
+  Sc, M: Byte;
+begin
+  D := GHalf[PWord(P)^];
+  Dmin := GHalf[PWord(P + 2)^];
+  Scales := P + 4;
+  Q := P + 16;
+  Is_ := 0;
+  YBase := 0;
+  for J := 0 to QK_K div 64 - 1 do
+  begin
+    GetScaleMinK4(Is_, Scales, Sc, M);
+    D1 := D * Sc; M1 := Dmin * M;
+    GetScaleMinK4(Is_ + 1, Scales, Sc, M);
+    D2 := D * Sc; M2 := Dmin * M;
+    for L := 0 to 31 do
+      Dst[YBase + L] := D1 * (Q[L] and $0F) - M1;
+    for L := 0 to 31 do
+      Dst[YBase + 32 + L] := D2 * (Q[L] shr 4) - M2;
+    Inc(Q, 32);
+    Inc(Is_, 2);
+    Inc(YBase, 64);
+  end;
+end;
+
+{ Q5_K super-block: d,dmin (F16) + 12 scale + 32 high-bit + 128 quant = 176 B }
+procedure DequantSuperQ5_K(P: PByte; Dst: PSingle);
+var
+  D, Dmin, D1, D2, M1, M2: Single;
+  Scales, Qh, Ql: PByte;
+  J, L, Is_, YBase, U1, U2: Integer;
+  Sc, M: Byte;
+begin
+  D := GHalf[PWord(P)^];
+  Dmin := GHalf[PWord(P + 2)^];
+  Scales := P + 4;
+  Qh := P + 16;
+  Ql := P + 48;
+  Is_ := 0;
+  U1 := 1;
+  U2 := 2;
+  YBase := 0;
+  for J := 0 to QK_K div 64 - 1 do
+  begin
+    GetScaleMinK4(Is_, Scales, Sc, M);
+    D1 := D * Sc; M1 := Dmin * M;
+    GetScaleMinK4(Is_ + 1, Scales, Sc, M);
+    D2 := D * Sc; M2 := Dmin * M;
+    for L := 0 to 31 do
+      if (Qh[L] and U1) <> 0 then
+        Dst[YBase + L] := D1 * ((Ql[L] and $0F) + 16) - M1
+      else
+        Dst[YBase + L] := D1 * (Ql[L] and $0F) - M1;
+    for L := 0 to 31 do
+      if (Qh[L] and U2) <> 0 then
+        Dst[YBase + 32 + L] := D2 * ((Ql[L] shr 4) + 16) - M2
+      else
+        Dst[YBase + 32 + L] := D2 * (Ql[L] shr 4) - M2;
+    Inc(Ql, 32);
+    Inc(Is_, 2);
+    U1 := U1 shl 2;
+    U2 := U2 shl 2;
+    Inc(YBase, 64);
+  end;
+end;
+
+{ Q6_K super-block: 128 low + 64 high + 16 int8 scales + d (F16) = 210 B }
+procedure DequantSuperQ6_K(P: PByte; Dst: PSingle);
+var
+  D: Single;
+  Ql, Qh: PByte;
+  Sc: PShortInt;
+  N, L, Is_, YBase: Integer;
+begin
+  D := GHalf[PWord(P + 208)^];
+  Ql := P;
+  Qh := P + 128;
+  Sc := PShortInt(P + 192);
+  YBase := 0;
+  for N := 0 to QK_K div 128 - 1 do
+  begin
+    for L := 0 to 31 do
+    begin
+      Is_ := L div 16;
+      Dst[YBase + L] := D * Sc[Is_] *
+        (Integer((Ql[L] and $0F) or (((Qh[L] shr 0) and 3) shl 4)) - 32);
+      Dst[YBase + L + 32] := D * Sc[Is_ + 2] *
+        (Integer((Ql[L + 32] and $0F) or (((Qh[L] shr 2) and 3) shl 4)) - 32);
+      Dst[YBase + L + 64] := D * Sc[Is_ + 4] *
+        (Integer((Ql[L] shr 4) or (((Qh[L] shr 4) and 3) shl 4)) - 32);
+      Dst[YBase + L + 96] := D * Sc[Is_ + 6] *
+        (Integer((Ql[L + 32] shr 4) or (((Qh[L] shr 6) and 3) shl 4)) - 32);
+    end;
+    Inc(Ql, 64);
+    Inc(Qh, 32);
+    Inc(Sc, 8);
+    Inc(YBase, 128);
+  end;
+end;
+
+function DotRowQ4_K(Row: PByte; X: PSingle; NCols: Integer): Single;
+var
+  SB, NSB: Integer;
+  P: PByte;
+  Acc: Double;
+  Blk: array [0 .. QK_K - 1] of Single;
+begin
+  Acc := 0;
+  NSB := NCols div QK_K;
+  P := Row;
+  for SB := 0 to NSB - 1 do
+  begin
+    DequantSuperQ4_K(P, @Blk[0]);
+    Acc := Acc + DotF32(@Blk[0], X + SB * QK_K, QK_K);
+    Inc(P, 144);
+  end;
+  Result := Acc;
+end;
+
+function DotRowQ5_K(Row: PByte; X: PSingle; NCols: Integer): Single;
+var
+  SB, NSB: Integer;
+  P: PByte;
+  Acc: Double;
+  Blk: array [0 .. QK_K - 1] of Single;
+begin
+  Acc := 0;
+  NSB := NCols div QK_K;
+  P := Row;
+  for SB := 0 to NSB - 1 do
+  begin
+    DequantSuperQ5_K(P, @Blk[0]);
+    Acc := Acc + DotF32(@Blk[0], X + SB * QK_K, QK_K);
+    Inc(P, 176);
+  end;
+  Result := Acc;
+end;
+
+function DotRowQ6_K(Row: PByte; X: PSingle; NCols: Integer): Single;
+var
+  SB, NSB: Integer;
+  P: PByte;
+  Acc: Double;
+  Blk: array [0 .. QK_K - 1] of Single;
+begin
+  Acc := 0;
+  NSB := NCols div QK_K;
+  P := Row;
+  for SB := 0 to NSB - 1 do
+  begin
+    DequantSuperQ6_K(P, @Blk[0]);
+    Acc := Acc + DotF32(@Blk[0], X + SB * QK_K, QK_K);
+    Inc(P, 210);
+  end;
+  Result := Acc;
+end;
+
 { TQTensor }
 
 class function TQTensor.RowBytesOf(ATyp: TGgmlType; ACols: Integer): Int64;
@@ -434,6 +617,9 @@ begin
     gtQ4_0: Result := Int64(ACols div QK) * 18;
     gtQ4_1: Result := Int64(ACols div QK) * 20;
     gtQ8_0: Result := Int64(ACols div QK) * 34;
+    gtQ4_K: Result := Int64(ACols div QK_K) * 144;
+    gtQ5_K: Result := Int64(ACols div QK_K) * 176;
+    gtQ6_K: Result := Int64(ACols div QK_K) * 210;
   else
     raise Exception.Create('TQTensor: unsupported GGML type');
   end;
@@ -495,6 +681,9 @@ begin
           gtQ8_0: Y[RI] := DotRowQ8_0(P, PXQ, PXS, NB);
           gtQ4_0: Y[RI] := DotRowQ4_0(P, PXQ, PXS, NB);
           gtQ4_1: Y[RI] := DotRowQ4_1(P, PXQ, PXS, PXSum, NB);
+          gtQ4_K: Y[RI] := DotRowQ4_K(P, X, LCols);
+          gtQ5_K: Y[RI] := DotRowQ5_K(P, X, LCols);
+          gtQ6_K: Y[RI] := DotRowQ6_K(P, X, LCols);
         end;
       end)
   else
@@ -506,6 +695,9 @@ begin
         gtQ8_0: Y[R] := DotRowQ8_0(Base + Int64(R) * RB, PXQ, PXS, NB);
         gtQ4_0: Y[R] := DotRowQ4_0(Base + Int64(R) * RB, PXQ, PXS, NB);
         gtQ4_1: Y[R] := DotRowQ4_1(Base + Int64(R) * RB, PXQ, PXS, PXSum, NB);
+        gtQ4_K: Y[R] := DotRowQ4_K(Base + Int64(R) * RB, X, LCols);
+        gtQ5_K: Y[R] := DotRowQ5_K(Base + Int64(R) * RB, X, LCols);
+        gtQ6_K: Y[R] := DotRowQ6_K(Base + Int64(R) * RB, X, LCols);
       end;
     end;
 end;
@@ -564,6 +756,33 @@ begin
             Dst[B * QK + I + QK div 2] := Integer(Q[I] shr 4) * D + M;
           end;
           Inc(P, 20);
+        end;
+      end;
+    gtQ4_K:
+      begin
+        NB := Cols div QK_K;
+        for B := 0 to NB - 1 do
+        begin
+          DequantSuperQ4_K(P, Dst + B * QK_K);
+          Inc(P, 144);
+        end;
+      end;
+    gtQ5_K:
+      begin
+        NB := Cols div QK_K;
+        for B := 0 to NB - 1 do
+        begin
+          DequantSuperQ5_K(P, Dst + B * QK_K);
+          Inc(P, 176);
+        end;
+      end;
+    gtQ6_K:
+      begin
+        NB := Cols div QK_K;
+        for B := 0 to NB - 1 do
+        begin
+          DequantSuperQ6_K(P, Dst + B * QK_K);
+          Inc(P, 210);
         end;
       end;
   end;
