@@ -1,0 +1,42 @@
+<|user|>Hallo!<|assistant|>Hallo! Wie kann ich dir helfen?<|eos|>
+<|user|>Wer bist du?<|assistant|>Ich bin Prism, ein kleines Sprachmodell, das vollstaendig in Delphi implementiert ist.<|eos|>
+<|user|>Was ist die Hauptstadt von Deutschland?<|assistant|>Die Hauptstadt von Deutschland ist Berlin.<|eos|>
+<|user|>Was ist die Hauptstadt von Frankreich?<|assistant|>Die Hauptstadt von Frankreich ist Paris.<|eos|>
+<|user|>Was ist die Hauptstadt von Italien?<|assistant|>Die Hauptstadt von Italien ist Rom.<|eos|>
+<|user|>Was ist die Hauptstadt von Spanien?<|assistant|>Die Hauptstadt von Spanien ist Madrid.<|eos|>
+<|user|>Was ist die Hauptstadt von Oesterreich?<|assistant|>Die Hauptstadt von Oesterreich ist Wien.<|eos|>
+<|user|>Was ist die Hauptstadt der Schweiz?<|assistant|>Die Hauptstadt der Schweiz ist Bern.<|eos|>
+<|user|>Was ist 2 plus 2?<|assistant|>2 plus 2 ergibt 4.<|eos|>
+<|user|>Was ist 3 plus 5?<|assistant|>3 plus 5 ergibt 8.<|eos|>
+<|user|>Was ist 10 minus 4?<|assistant|>10 minus 4 ergibt 6.<|eos|>
+<|user|>Was ist 6 mal 7?<|assistant|>6 mal 7 ergibt 42.<|eos|>
+<|user|>Was ist Delphi?<|assistant|>Delphi ist eine Entwicklungsumgebung fuer die Programmiersprache Object Pascal, mit der native Anwendungen fuer Windows, macOS, Linux, Android und iOS erstellt werden.<|eos|>
+<|user|>Was ist Object Pascal?<|assistant|>Object Pascal ist eine objektorientierte Programmiersprache, die in Delphi verwendet wird.<|eos|>
+<|user|>Was ist ein Compiler?<|assistant|>Ein Compiler uebersetzt Quellcode in ausfuehrbaren Maschinencode.<|eos|>
+<|user|>Was ist ein LLM?<|assistant|>Ein LLM ist ein grosses Sprachmodell, das Texte verstehen und erzeugen kann.<|eos|>
+<|user|>Was ist ein Transformer?<|assistant|>Ein Transformer ist eine neuronale Netzarchitektur, die mit Attention arbeitet und die Grundlage moderner Sprachmodelle bildet.<|eos|>
+<|user|>Was ist Attention?<|assistant|>Attention ist ein Mechanismus, mit dem ein Modell lernt, welche Teile der Eingabe fuer die Ausgabe wichtig sind.<|eos|>
+<|user|>Was ist ein Token?<|assistant|>Ein Token ist eine kleine Texteinheit, zum Beispiel ein Wortteil, mit der ein Sprachmodell rechnet.<|eos|>
+<|user|>Wie viele Tage hat eine Woche?<|assistant|>Eine Woche hat sieben Tage.<|eos|>
+<|user|>Wie viele Monate hat ein Jahr?<|assistant|>Ein Jahr hat zwoelf Monate.<|eos|>
+<|user|>Wie viele Stunden hat ein Tag?<|assistant|>Ein Tag hat 24 Stunden.<|eos|>
+<|user|>Welche Farbe hat der Himmel?<|assistant|>Der Himmel ist bei klarem Wetter blau.<|eos|>
+<|user|>Welche Farbe hat Gras?<|assistant|>Gras ist gruen.<|eos|>
+<|user|>Welche Farbe hat Schnee?<|assistant|>Schnee ist weiss.<|eos|>
+<|user|>Was ist Wasser?<|assistant|>Wasser ist eine chemische Verbindung aus Wasserstoff und Sauerstoff mit der Formel H2O.<|eos|>
+<|user|>Wie heisst der groesste Planet?<|assistant|>Der groesste Planet unseres Sonnensystems ist Jupiter.<|eos|>
+<|user|>Wie heisst der naechste Stern?<|assistant|>Der naechste Stern ist die Sonne.<|eos|>
+<|user|>Wie viele Beine hat eine Spinne?<|assistant|>Eine Spinne hat acht Beine.<|eos|>
+<|user|>Wie viele Beine hat ein Insekt?<|assistant|>Ein Insekt hat sechs Beine.<|eos|>
+<|user|>Danke!<|assistant|>Gern geschehen!<|eos|>
+<|user|>Tschuess!<|assistant|>Tschuess, bis zum naechsten Mal!<|eos|>
+<|user|>Guten Morgen!<|assistant|>Guten Morgen! Ich hoffe, du hast einen schoenen Tag.<|eos|>
+<|user|>Wie geht es dir?<|assistant|>Mir geht es gut, danke der Nachfrage. Wie kann ich helfen?<|eos|>
+<|user|>Erzaehl mir einen Fakt.<|assistant|>Die Erde umkreist die Sonne in etwa 365 Tagen.<|eos|>
+<|user|>Nenne eine Programmiersprache.<|assistant|>Object Pascal ist eine Programmiersprache.<|eos|>
+<|user|>Was ist REST?<|assistant|>REST ist ein Architekturstil fuer Web-Schnittstellen, bei dem Ressourcen ueber HTTP angesprochen werden.<|eos|>
+<|user|>Was ist JSON?<|assistant|>JSON ist ein textbasiertes Datenformat zum Austausch strukturierter Daten.<|eos|>
+<|user|>Was ist HTTP?<|assistant|>HTTP ist das Protokoll, mit dem Browser und Server im Web kommunizieren.<|eos|>
+<|user|>Was ist eine GPU?<|assistant|>Eine GPU ist ein Grafikprozessor, der viele Berechnungen parallel ausfuehren kann.<|eos|>
+<|user|>Was ist eine CPU?<|assistant|>Eine CPU ist der Hauptprozessor eines Computers.<|eos|>
+<|user|>Was ist RAM?<|assistant|>RAM ist der Arbeitsspeicher eines Computers, der Daten fuer schnellen Zugriff haelt.<|eos|>
