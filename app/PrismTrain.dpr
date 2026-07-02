@@ -15,6 +15,7 @@ uses
   System.SysUtils,
   System.Classes,
   System.IOUtils,
+  System.Math,
   System.Diagnostics,
   Prism.Types in '..\src\Prism.Types.pas',
   Prism.Vector in '..\src\Prism.Vector.pas',
@@ -23,6 +24,7 @@ uses
   Prism.Model in '..\src\Prism.Model.pas',
   Prism.Streaming in '..\src\Prism.Streaming.pas',
   Prism.Gpu in '..\src\Prism.Gpu.pas',
+  Prism.Laws in '..\src\Prism.Laws.pas',
   Prism.Inference in '..\src\Prism.Inference.pas',
   Prism.Train in '..\src\Prism.Train.pas',
   Prism.Multimodal in '..\src\Prism.Multimodal.pas',
@@ -162,10 +164,12 @@ procedure CmdTrain;
 var
   W: TFullWeights;
   Trainer: TTrainer;
-  Tokens: TArray<Integer>;
+  Domains: TArray<TArray<Integer>>;
+  TokenFiles: TArray<string>;
+  TotalLen, Pick: Int64;
   Rng: TRng;
-  Steps, SaveEvery, S: Integer;
-  LR, WD: Single;
+  Steps, SaveEvery, S, D, I: Integer;
+  LR, WD, RouterAux: Single;
   Loss, AvgLoss: Double;
   ModelPath: string;
   Watch: TStopwatch;
@@ -175,8 +179,30 @@ begin
   try
     W.LoadFromFile(ModelPath);
     Say('Model loaded: ' + W.Config.ToString);
-    Tokens := LoadTokensFile(ArgValue('tokens', 'corpus.tokens'));
-    Say(Format('Training data: %d tokens', [Length(Tokens)]));
+    { --tokens accepts a comma-separated list; with more than one file,
+      file index = domain id = expert ("thematic area") and the router
+      is guided by an auxiliary loss (--router-aux, default 0.1) }
+    TokenFiles := ArgValue('tokens', 'corpus.tokens').Split([',']);
+    SetLength(Domains, Length(TokenFiles));
+    TotalLen := 0;
+    for I := 0 to High(TokenFiles) do
+    begin
+      Domains[I] := LoadTokensFile(Trim(TokenFiles[I]));
+      Inc(TotalLen, Length(Domains[I]));
+      Say(Format('Training data [domain %d]: %s (%d tokens)',
+        [I, Trim(TokenFiles[I]), Length(Domains[I])]));
+    end;
+    if Length(Domains) > 1 then
+    begin
+      RouterAux := ArgFloat('router-aux', 0.1);
+      if not W.Config.IsMoE then
+        Say('WARNING: multiple domain files but the model has no experts ' +
+          '(init with --experts N).');
+      if Length(Domains) > W.Config.NumExperts then
+        Say('WARNING: more domain files than experts; domain id will wrap.');
+    end
+    else
+      RouterAux := ArgFloat('router-aux', 0.0);
     Trainer := TTrainer.Create(W, ArgInt('batch', 4), ArgInt('seq', 128));
     try
       Steps := ArgInt('steps', 500);
@@ -188,7 +214,19 @@ begin
       Watch := TStopwatch.StartNew;
       for S := 1 to Steps do
       begin
-        Loss := Trainer.TrainStep(Tokens, Rng, LR, WD);
+        { pick a domain weighted by its corpus size }
+        D := 0;
+        if Length(Domains) > 1 then
+        begin
+          Pick := Int64(Rng.NextInt(High(Integer))) mod TotalLen;
+          while (D < High(Domains)) and (Pick >= Length(Domains[D])) do
+          begin
+            Dec(Pick, Length(Domains[D]));
+            Inc(D);
+          end;
+        end;
+        Loss := Trainer.TrainStepDomain(Domains[D], Rng, LR, WD,
+          D mod Max(1, W.Config.NumExperts), RouterAux);
         if AvgLoss = 0 then
           AvgLoss := Loss
         else

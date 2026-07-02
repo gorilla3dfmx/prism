@@ -45,6 +45,8 @@ type
     FExpertIdx: TArray<Integer>; // [L*B*T] selected expert
     FInputs, FTargets: TArray<Integer>;
     FStep: Integer;
+    FDomainId: Integer;   // -1 = free routing
+    FRouterAux: Single;   // weight of the domain-routing auxiliary loss
     function PP(Off: Int64): PSingle; inline;  // Params
     function PG(Off: Int64): PSingle; inline;  // Grads
     function PA(Off: Int64): PSingle; inline;  // Acts
@@ -58,6 +60,13 @@ type
     procedure Update(LR, Beta1, Beta2, Eps, WeightDecay: Single);
     function TrainStep(const Tokens: TArray<Integer>; var Rng: TRng;
       LR, WeightDecay: Single): Single;
+    { Domain-guided MoE training ("thematic areas"): the batch is drawn
+      from Tokens and the router additionally receives a cross-entropy
+      pull towards expert DomainId (RouterAux = loss weight, e.g. 0.1).
+      This is how experts specialize on knowledge domains. }
+    function TrainStepDomain(const Tokens: TArray<Integer>; var Rng: TRng;
+      LR, WeightDecay: Single; DomainId: Integer;
+      RouterAux: Single): Single;
     property StepCount: Integer read FStep;
     property Batch: Integer read FB;
     property SeqLen: Integer read FT;
@@ -189,6 +198,8 @@ begin
   SetLength(FInputs, FB * FT);
   SetLength(FTargets, FB * FT);
   FStep := 0;
+  FDomainId := -1;
+  FRouterAux := 0;
 end;
 
 function TTrainer.PP(Off: Int64): PSingle;
@@ -276,7 +287,7 @@ var
   BT, LB, XB: Int64;
   BTI: Integer;
   EIdx, I, J, K: Integer;
-  GateV, DGate, D: Single;
+  GateV, DGate, D, AuxScale: Single;
   DRes3, DRes2, DLn2, X, OP, GeluP, FchP, RP: PSingle;
   TmpDO, TmpDGelu, TmpDFch, TmpDLogit: TArray<Single>;
   WRow: PSingle;
@@ -356,6 +367,17 @@ begin
         TmpDLogit[K] := GateV * (1.0 - RP[K]) * DGate
       else
         TmpDLogit[K] := -GateV * RP[K] * DGate;
+    end;
+    { Domain-guided routing: auxiliary cross-entropy that pulls the
+      router towards the sample's domain expert ("thematic area") }
+    if (FDomainId >= 0) and (FDomainId < AL.E) and (FRouterAux > 0) then
+    begin
+      AuxScale := FRouterAux / BT;
+      for K := 0 to AL.E - 1 do
+        if K = FDomainId then
+          TmpDLogit[K] := TmpDLogit[K] + AuxScale * (RP[K] - 1.0)
+        else
+          TmpDLogit[K] := TmpDLogit[K] + AuxScale * RP[K];
     end;
     for K := 0 to AL.E - 1 do
     begin
@@ -553,9 +575,20 @@ end;
 function TTrainer.TrainStep(const Tokens: TArray<Integer>; var Rng: TRng;
   LR, WeightDecay: Single): Single;
 begin
+  Result := TrainStepDomain(Tokens, Rng, LR, WeightDecay, -1, 0);
+end;
+
+function TTrainer.TrainStepDomain(const Tokens: TArray<Integer>;
+  var Rng: TRng; LR, WeightDecay: Single; DomainId: Integer;
+  RouterAux: Single): Single;
+begin
+  FDomainId := DomainId;
+  FRouterAux := RouterAux;
   NextBatch(Tokens, Rng);
   Result := ForwardBackward;
   Update(LR, 0.9, 0.999, 1e-8, WeightDecay);
+  FDomainId := -1;
+  FRouterAux := 0;
 end;
 
 { TTrainingService }

@@ -16,6 +16,8 @@ Prism is an LLM framework implemented entirely in **Delphi 13** — **without th
 | REST API compatible with **OpenAI** and **Ollama** (incl. streaming) | ✅ |
 | **Multimodal training** via byte-level tokenization (text, image, audio, video, 3D, binary) | ✅ |
 | Online fine-tuning via REST (`POST /api/train`) | ✅ |
+| **Law layer**: exact expression/formula evaluation, tool calling (`<<calc: ...>>`), law-grounded answer falsification | ✅ |
+| Domain-guided expert training (corpora → thematic areas, `x_areas` routing report) | ✅ |
 | GPU backend via OpenCL (dynamically loaded, no SDK required) | ⚠️ experimental |
 | Billion-parameter models | ✅ via GGUF + quantization + streaming (64-bit targets) |
 
@@ -184,9 +186,37 @@ Instead of loading the entire model, Prism keeps only a **resident portion** (em
 
 `--experts N` at `init` creates N FFN experts per layer plus a router. The router selects **exactly one expert per token** (top-1) — so only a subgraph is ever computed instead of the whole network, and with streaming only the areas that are actually addressed need to be in memory. The specialization of the areas emerges on its own during training (router gradients via softmax backprop). Frequently used areas stay "warm" in the LRU cache — exactly the desired optimization: search in a subgraph instead of a full pass.
 
+**Domain-guided areas:** pass several corpora to `train` — file index = domain = expert:
+
+```bat
+PrismTrain train --model model\areas.prism --tokens model\math.tokens,model\facts.tokens --router-aux 0.3 --steps 900
+```
+
+The auxiliary router loss (`--router-aux`) pulls each domain's tokens towards "its" expert, so the areas specialize on knowledge domains (math, facts, ...). At inference the router first recognizes *which* area applies, then computes only that subgraph — chat responses report the routing as `"x_areas": [76, 0]` (router decisions per expert for the request).
+
+### The law layer (`Prism.Laws`)
+
+Exact, symbolic knowledge next to the statistical model: an expression evaluator (arithmetic, functions, physical constants) plus a curated formula library (kinetic energy, Ohm's law, ideal gas, pendulum period, ...). Deterministic — the neural model proposes, the law layer computes.
+
+```bash
+curl http://localhost:11434/v1/tools/calc -d '{"expression":"0.5*m*v^2","variables":{"m":80,"v":3}}'
+curl "http://localhost:11434/v1/laws?q=energy"
+curl http://localhost:11434/v1/laws/eval -d '{"law":"kinetic_energy","variables":{"m":80,"v":3}}'
+```
+
+**Tool calling** (`"use_tools": true` in chat requests): when the model emits `<<calc: EXPRESSION>>`, the server evaluates it exactly and injects `<<result: VALUE>>` into both the output and the model context, then generation continues. GGUF instruct models get a system prompt teaching the protocol automatically; native Prism models learn it from their training corpus (see `data\tool_corpus.txt` for the sample format). Note: very small instruct models (0.5B) often ignore the protocol — the law-grounded verification below catches their arithmetic anyway.
+
 ### Self-verification
 
-Three independent signals per answer: (1) **Perplexity** — how confident the model was in its own answer (rescoring), (2) **self-consistency** — similarity of alternative samples to the answer, (3) **critic pass** — the model rates its own answer (P("yes") vs. P("no")). From these, `pass`/`warn`/`fail` is derived; thresholds are configurable in `TVerifier`. With small self-trained models the critic is naturally weak — perplexity and consistency then carry the verdict.
+Four signals per answer: (1) **Perplexity** — how confident the model was in its own answer (rescoring), (2) **self-consistency** — similarity of alternative samples to the answer, (3) **critic pass** — the model rates its own answer (P("yes") vs. P("no")), (4) **law checks** — arithmetic claims in the answer ("6 mal 7 ergibt 42", "10 / 4 = 2.5") are extracted and re-computed by the law layer. A failed re-computation deterministically falsifies the answer (`verdict: fail`), and verified claims upgrade it — laws beat statistics. Thresholds are configurable in `TVerifier`; with small self-trained models the critic is naturally weak, so the law checks carry the verdict:
+
+```json
+"x_verification": {
+  "law_checks": { "total": 1, "passed": 0, "failed": 1,
+                  "details": ["12 * 3 = 130  [FAIL: expected 36]"] },
+  "verdict": "fail"
+}
+```
 
 ### Multimodality (byte-level)
 

@@ -27,7 +27,7 @@ uses
   IdHTTPServer, IdCustomHTTPServer, IdContext, IdGlobal,
   Prism.Types, Prism.Model, Prism.Streaming, Prism.Tokenizer,
   Prism.Inference, Prism.Llama, Prism.Verify, Prism.Multimodal,
-  Prism.Train, Prism.Gpu;
+  Prism.Train, Prism.Gpu, Prism.Laws;
 
 type
   TServerOptions = record
@@ -83,6 +83,12 @@ type
     procedure HandleModels(AResponseInfo: TIdHTTPResponseInfo);
     procedure HandleTags(AResponseInfo: TIdHTTPResponseInfo);
     procedure HandleHealth(AResponseInfo: TIdHTTPResponseInfo);
+    procedure HandleLawsList(AResponseInfo: TIdHTTPResponseInfo;
+      const Query: string);
+    procedure HandleCalc(Body: TJSONObject;
+      AResponseInfo: TIdHTTPResponseInfo);
+    procedure HandleLawEval(Body: TJSONObject;
+      AResponseInfo: TIdHTTPResponseInfo);
   public
     constructor Create(const AOpts: TServerOptions; const ALog: TProc<string>);
     destructor Destroy; override;
@@ -429,21 +435,44 @@ end;
 
 procedure TPrismRestServer.HandleChat(AContext: TIdContext;
   Body: TJSONObject; AResponseInfo: TIdHTTPResponseInfo; OllamaStyle: Boolean);
+const
+  TOOLS_PROMPT =
+    'You have access to an exact calculator tool. Whenever you need to ' +
+    'compute something numeric, write <<calc: EXPRESSION>> and stop; the ' +
+    'exact result will be inserted as <<result: VALUE>>, then continue ' +
+    'your answer using that value. Supported: + - * / ^ ( ), functions ' +
+    'sqrt, sin, cos, tan, exp, ln, log, abs, min, max, pow(a,b), round, ' +
+    'and constants pi, e, c, g, h, kb, na, qe, r, ke. ' +
+    'Example: 12.5*380 is <<calc: 12.5*380>> <<result: 4750>> 4750.';
 var
-  Msgs: TChatMessages;
+  Msgs, MsgsWithTools: TChatMessages;
   LastUser, Id, Text: string;
   SP: TSamplingParams;
-  Stream, DoVerify: Boolean;
+  Stream, DoVerify, UseTools: Boolean;
   PromptTokens: TArray<Integer>;
   Gen: TGenerator;
   Usage: TUsage;
   Root, Choice, Msg, UsageObj: TJSONObject;
-  Choices: TJSONArray;
+  Choices, Areas: TJSONArray;
   Ver: TVerificationResult;
   Created: Int64;
   StreamWrite: TProc<string>;
   ChunkJson: TFunc<string, Boolean, string>;
+  ToolFn: TToolHandler;
+  AreaHist: TArray<Int64>;
+  I: Integer;
 begin
+  ToolFn :=
+    function(const Call: string): string
+    var
+      V: Double;
+      Err: string;
+    begin
+      if TryEvalExpression(Call, nil, V, Err) then
+        Result := FormatValue(V)
+      else
+        Result := 'ERROR: ' + Err;
+    end;
   { As closure variables instead of local routines, so they can be called
     from within the OnToken callback (E2555) }
   StreamWrite :=
@@ -507,10 +536,25 @@ begin
   SP := ParseSampling(Body);
   Stream := GetBool(Body, 'stream', OllamaStyle);
   DoVerify := GetBool(Body, 'verify', FOpts.VerifyDefault) and not Stream;
+  UseTools := GetBool(Body, 'use_tools', False) or
+    (Body.GetValue('tools') <> nil);
+  if UseTools and (FBackend is TLlamaBackend) then
+  begin
+    { GGUF instruct models: prepend a system message that teaches the
+      <<calc: ...>> protocol. Native Prism models are expected to have
+      learned the protocol from their training corpus instead - an
+      unseen system text would only derail a small model. }
+    SetLength(MsgsWithTools, Length(Msgs) + 1);
+    MsgsWithTools[0] := TChatMessage.Make('system', TOOLS_PROMPT);
+    for I := 0 to High(Msgs) do
+      MsgsWithTools[I + 1] := Msgs[I];
+    Msgs := MsgsWithTools;
+  end;
   PromptTokens := FBackend.Tokenizer.BuildChatTokens(Msgs,
     FTemplate);
   Id := NewId('chatcmpl-');
   Created := UnixNow;
+  AreaHist := nil;
 
   FGenLock.Enter;
   try
@@ -522,18 +566,32 @@ begin
           BeginStream(AResponseInfo, 'application/x-ndjson')
         else
           BeginStream(AResponseInfo, 'text/event-stream');
-        Gen.Generate(PromptTokens, SP,
-          procedure(Chunk: string)
-          begin
-            StreamWrite(ChunkJson(Chunk, False));
-          end, Usage);
+        if UseTools then
+          Gen.GenerateWithTools(PromptTokens, SP,
+            procedure(Chunk: string)
+            begin
+              StreamWrite(ChunkJson(Chunk, False));
+            end, Usage, ToolFn)
+        else
+          Gen.Generate(PromptTokens, SP,
+            procedure(Chunk: string)
+            begin
+              StreamWrite(ChunkJson(Chunk, False));
+            end, Usage);
         StreamWrite(ChunkJson('', True));
         if not OllamaStyle then
           StreamWrite('[DONE]');
         StreamEnd(AContext);
         Exit;
       end;
-      Text := Gen.Generate(PromptTokens, SP, nil, Usage);
+      if UseTools then
+        Text := Gen.GenerateWithTools(PromptTokens, SP, nil, Usage, ToolFn)
+      else
+        Text := Gen.Generate(PromptTokens, SP, nil, Usage);
+      { thematic areas: MoE routing histogram of this request }
+      if (Gen.Engine is TPrismEngine) and
+        (Length(TPrismEngine(Gen.Engine).ExpertHistogram) > 1) then
+        AreaHist := Copy(TPrismEngine(Gen.Engine).ExpertHistogram);
     finally
       Gen.Free;
     end;
@@ -583,6 +641,14 @@ begin
   end;
   if DoVerify then
     Root.AddPair('x_verification', Ver.ToJson);
+  if Length(AreaHist) > 1 then
+  begin
+    { router decisions per expert ("thematic area") for this request }
+    Areas := TJSONArray.Create;
+    for I := 0 to High(AreaHist) do
+      Areas.Add(AreaHist[I]);
+    Root.AddPair('x_areas', Areas);
+  end;
   SendJson(AResponseInfo, Root);
 end;
 
@@ -803,6 +869,125 @@ begin
   SendJson(AResponseInfo, Root);
 end;
 
+procedure TPrismRestServer.HandleLawsList(AResponseInfo: TIdHTTPResponseInfo;
+  const Query: string);
+var
+  Root, LJ, VJ: TJSONObject;
+  Arr, VArr: TJSONArray;
+  Laws: TArray<TLaw>;
+  L: TLaw;
+  V: TLawVariable;
+  Q: string;
+begin
+  Q := '';
+  if Query.StartsWith('q=') then
+    Q := TNetEncoding.URL.Decode(Copy(Query, 3, MaxInt));
+  Laws := SearchLaws(Q);
+  Root := TJSONObject.Create;
+  Arr := TJSONArray.Create;
+  for L in Laws do
+  begin
+    LJ := TJSONObject.Create;
+    LJ.AddPair('name', L.Name);
+    LJ.AddPair('formula', L.Formula);
+    LJ.AddPair('output', L.Output);
+    LJ.AddPair('description', L.Description);
+    VArr := TJSONArray.Create;
+    for V in L.Vars do
+    begin
+      VJ := TJSONObject.Create;
+      VJ.AddPair('name', V.Name);
+      VJ.AddPair('unit', V.Units);
+      VJ.AddPair('meaning', V.Meaning);
+      VArr.AddElement(VJ);
+    end;
+    LJ.AddPair('variables', VArr);
+    Arr.AddElement(LJ);
+  end;
+  Root.AddPair('laws', Arr);
+  Root.AddPair('count', TJSONNumber.Create(Length(Laws)));
+  SendJson(AResponseInfo, Root);
+end;
+
+function ReadVariables(Body: TJSONObject): TDictionary<string, Double>;
+var
+  VarsObj: TJSONObject;
+  P: TJSONPair;
+begin
+  Result := TDictionary<string, Double>.Create;
+  VarsObj := Body.GetValue('variables') as TJSONObject;
+  if VarsObj <> nil then
+    for P in VarsObj do
+      if P.JsonValue is TJSONNumber then
+        Result.AddOrSetValue(LowerCase(P.JsonString.Value),
+          TJSONNumber(P.JsonValue).AsDouble);
+end;
+
+procedure TPrismRestServer.HandleCalc(Body: TJSONObject;
+  AResponseInfo: TIdHTTPResponseInfo);
+var
+  Expr, Err: string;
+  Vars: TDictionary<string, Double>;
+  V: Double;
+  Root: TJSONObject;
+begin
+  Expr := GetStr(Body, 'expression', '');
+  if Expr = '' then
+  begin
+    SendError(AResponseInfo, 400, 'Field "expression" is missing.');
+    Exit;
+  end;
+  Vars := ReadVariables(Body);
+  try
+    if not TryEvalExpression(Expr, Vars, V, Err) then
+    begin
+      SendError(AResponseInfo, 400, Err);
+      Exit;
+    end;
+  finally
+    Vars.Free;
+  end;
+  Root := TJSONObject.Create;
+  Root.AddPair('expression', Expr);
+  Root.AddPair('result', TJSONNumber.Create(V));
+  Root.AddPair('text', FormatValue(V));
+  SendJson(AResponseInfo, Root);
+end;
+
+procedure TPrismRestServer.HandleLawEval(Body: TJSONObject;
+  AResponseInfo: TIdHTTPResponseInfo);
+var
+  Name, Err: string;
+  Vars: TDictionary<string, Double>;
+  V: Double;
+  Law: TLaw;
+  Root: TJSONObject;
+begin
+  Name := GetStr(Body, 'law', '');
+  if Name = '' then
+  begin
+    SendError(AResponseInfo, 400, 'Field "law" is missing.');
+    Exit;
+  end;
+  Vars := ReadVariables(Body);
+  try
+    if not TryEvalLaw(Name, Vars, V, Law, Err) then
+    begin
+      SendError(AResponseInfo, 400, Err);
+      Exit;
+    end;
+  finally
+    Vars.Free;
+  end;
+  Root := TJSONObject.Create;
+  Root.AddPair('law', Law.Name);
+  Root.AddPair('formula', Law.Formula);
+  Root.AddPair('output', Law.Output);
+  Root.AddPair('result', TJSONNumber.Create(V));
+  Root.AddPair('text', FormatValue(V));
+  SendJson(AResponseInfo, Root);
+end;
+
 procedure TPrismRestServer.DoCommandOther(AContext: TIdContext;
   ARequestInfo: TIdHTTPRequestInfo; AResponseInfo: TIdHTTPResponseInfo);
 begin
@@ -850,6 +1035,12 @@ begin
         HandleGenerate(AContext, Body, AResponseInfo)
       else if ((Doc = '/api/train') or (Doc = '/v1/train')) and IsPost then
         HandleTrain(Body, AResponseInfo)
+      else if (Doc = '/v1/tools/calc') and IsPost then
+        HandleCalc(Body, AResponseInfo)
+      else if (Doc = '/v1/laws/eval') and IsPost then
+        HandleLawEval(Body, AResponseInfo)
+      else if (Doc = '/v1/laws') and not IsPost then
+        HandleLawsList(AResponseInfo, ARequestInfo.QueryParams)
       else if (Doc = '/v1/models') and not IsPost then
         HandleModels(AResponseInfo)
       else if (Doc = '/api/tags') and not IsPost then

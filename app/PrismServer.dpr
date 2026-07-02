@@ -29,6 +29,7 @@ uses
   Prism.Model in '..\src\Prism.Model.pas',
   Prism.Streaming in '..\src\Prism.Streaming.pas',
   Prism.Gpu in '..\src\Prism.Gpu.pas',
+  Prism.Laws in '..\src\Prism.Laws.pas',
   Prism.Inference in '..\src\Prism.Inference.pas',
   Prism.Gguf in '..\src\Prism.Gguf.pas',
   Prism.Llama in '..\src\Prism.Llama.pas',

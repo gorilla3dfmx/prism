@@ -1,0 +1,1000 @@
+<|user|>Was ist 17 mal 19?<|assistant|><<calc: 17*19>> <<result: 323>>
+Das Ergebnis ist 323.<|eos|>
+<|user|>Was ist 12 mal 6?<|assistant|><<calc: 12*6>> <<result: 72>>
+Das Ergebnis ist 72.<|eos|>
+<|user|>Was ist 9 mal 7?<|assistant|><<calc: 9*7>> <<result: 63>>
+Das Ergebnis ist 63.<|eos|>
+<|user|>Was ist 10 mal 3?<|assistant|><<calc: 10*3>> <<result: 30>>
+Das Ergebnis ist 30.<|eos|>
+<|user|>Was ist 15 mal 5?<|assistant|><<calc: 15*5>> <<result: 75>>
+Das Ergebnis ist 75.<|eos|>
+<|user|>Was ist 6 mal 10?<|assistant|><<calc: 6*10>> <<result: 60>>
+Das Ergebnis ist 60.<|eos|>
+<|user|>Was ist 16 plus 9?<|assistant|><<calc: 16+9>> <<result: 25>>
+Das Ergebnis ist 25.<|eos|>
+<|user|>Was ist 9 plus 10?<|assistant|><<calc: 9+10>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 8 mal 8?<|assistant|><<calc: 8*8>> <<result: 64>>
+Das Ergebnis ist 64.<|eos|>
+<|user|>Was ist 9 plus 19?<|assistant|><<calc: 9+19>> <<result: 28>>
+Das Ergebnis ist 28.<|eos|>
+<|user|>Was ist 5 plus 11?<|assistant|><<calc: 5+11>> <<result: 16>>
+Das Ergebnis ist 16.<|eos|>
+<|user|>Was ist 9 mal 7?<|assistant|><<calc: 9*7>> <<result: 63>>
+Das Ergebnis ist 63.<|eos|>
+<|user|>Was ist 21 mal 19?<|assistant|><<calc: 21*19>> <<result: 399>>
+Das Ergebnis ist 399.<|eos|>
+<|user|>Was ist 15 mal 7?<|assistant|><<calc: 15*7>> <<result: 105>>
+Das Ergebnis ist 105.<|eos|>
+<|user|>Was ist 15 mal 6?<|assistant|><<calc: 15*6>> <<result: 90>>
+Das Ergebnis ist 90.<|eos|>
+<|user|>Was ist 20 plus 15?<|assistant|><<calc: 20+15>> <<result: 35>>
+Das Ergebnis ist 35.<|eos|>
+<|user|>Was ist 15 plus 18?<|assistant|><<calc: 15+18>> <<result: 33>>
+Das Ergebnis ist 33.<|eos|>
+<|user|>Was ist 5 mal 18?<|assistant|><<calc: 5*18>> <<result: 90>>
+Das Ergebnis ist 90.<|eos|>
+<|user|>Was ist 18 plus 21?<|assistant|><<calc: 18+21>> <<result: 39>>
+Das Ergebnis ist 39.<|eos|>
+<|user|>Was ist 21 mal 17?<|assistant|><<calc: 21*17>> <<result: 357>>
+Das Ergebnis ist 357.<|eos|>
+<|user|>Was ist 8 mal 5?<|assistant|><<calc: 8*5>> <<result: 40>>
+Das Ergebnis ist 40.<|eos|>
+<|user|>Was ist 18 plus 2?<|assistant|><<calc: 18+2>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 21 plus 8?<|assistant|><<calc: 21+8>> <<result: 29>>
+Das Ergebnis ist 29.<|eos|>
+<|user|>Was ist 12 mal 20?<|assistant|><<calc: 12*20>> <<result: 240>>
+Das Ergebnis ist 240.<|eos|>
+<|user|>Was ist 21 mal 6?<|assistant|><<calc: 21*6>> <<result: 126>>
+Das Ergebnis ist 126.<|eos|>
+<|user|>Was ist 18 mal 6?<|assistant|><<calc: 18*6>> <<result: 108>>
+Das Ergebnis ist 108.<|eos|>
+<|user|>Was ist 20 mal 4?<|assistant|><<calc: 20*4>> <<result: 80>>
+Das Ergebnis ist 80.<|eos|>
+<|user|>Was ist 12 plus 10?<|assistant|><<calc: 12+10>> <<result: 22>>
+Das Ergebnis ist 22.<|eos|>
+<|user|>Was ist 14 plus 15?<|assistant|><<calc: 14+15>> <<result: 29>>
+Das Ergebnis ist 29.<|eos|>
+<|user|>Was ist 14 mal 6?<|assistant|><<calc: 14*6>> <<result: 84>>
+Das Ergebnis ist 84.<|eos|>
+<|user|>Was ist 8 plus 12?<|assistant|><<calc: 8+12>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 14 mal 18?<|assistant|><<calc: 14*18>> <<result: 252>>
+Das Ergebnis ist 252.<|eos|>
+<|user|>Was ist 2 mal 11?<|assistant|><<calc: 2*11>> <<result: 22>>
+Das Ergebnis ist 22.<|eos|>
+<|user|>Was ist 7 plus 2?<|assistant|><<calc: 7+2>> <<result: 9>>
+Das Ergebnis ist 9.<|eos|>
+<|user|>Was ist 7 mal 13?<|assistant|><<calc: 7*13>> <<result: 91>>
+Das Ergebnis ist 91.<|eos|>
+<|user|>Was ist 3 plus 11?<|assistant|><<calc: 3+11>> <<result: 14>>
+Das Ergebnis ist 14.<|eos|>
+<|user|>Was ist 11 plus 9?<|assistant|><<calc: 11+9>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 3 plus 2?<|assistant|><<calc: 3+2>> <<result: 5>>
+Das Ergebnis ist 5.<|eos|>
+<|user|>Was ist 21 mal 20?<|assistant|><<calc: 21*20>> <<result: 420>>
+Das Ergebnis ist 420.<|eos|>
+<|user|>Was ist 9 mal 2?<|assistant|><<calc: 9*2>> <<result: 18>>
+Das Ergebnis ist 18.<|eos|>
+<|user|>Was ist 5 plus 17?<|assistant|><<calc: 5+17>> <<result: 22>>
+Das Ergebnis ist 22.<|eos|>
+<|user|>Was ist 3 mal 2?<|assistant|><<calc: 3*2>> <<result: 6>>
+Das Ergebnis ist 6.<|eos|>
+<|user|>Was ist 6 mal 18?<|assistant|><<calc: 6*18>> <<result: 108>>
+Das Ergebnis ist 108.<|eos|>
+<|user|>Was ist 13 mal 2?<|assistant|><<calc: 13*2>> <<result: 26>>
+Das Ergebnis ist 26.<|eos|>
+<|user|>Was ist 4 plus 2?<|assistant|><<calc: 4+2>> <<result: 6>>
+Das Ergebnis ist 6.<|eos|>
+<|user|>Was ist 15 plus 20?<|assistant|><<calc: 15+20>> <<result: 35>>
+Das Ergebnis ist 35.<|eos|>
+<|user|>Was ist 12 mal 7?<|assistant|><<calc: 12*7>> <<result: 84>>
+Das Ergebnis ist 84.<|eos|>
+<|user|>Was ist 5 mal 12?<|assistant|><<calc: 5*12>> <<result: 60>>
+Das Ergebnis ist 60.<|eos|>
+<|user|>Was ist 13 mal 3?<|assistant|><<calc: 13*3>> <<result: 39>>
+Das Ergebnis ist 39.<|eos|>
+<|user|>Was ist 17 plus 13?<|assistant|><<calc: 17+13>> <<result: 30>>
+Das Ergebnis ist 30.<|eos|>
+<|user|>Was ist 4 plus 4?<|assistant|><<calc: 4+4>> <<result: 8>>
+Das Ergebnis ist 8.<|eos|>
+<|user|>Was ist 17 plus 4?<|assistant|><<calc: 17+4>> <<result: 21>>
+Das Ergebnis ist 21.<|eos|>
+<|user|>Was ist 21 mal 3?<|assistant|><<calc: 21*3>> <<result: 63>>
+Das Ergebnis ist 63.<|eos|>
+<|user|>Was ist 11 mal 12?<|assistant|><<calc: 11*12>> <<result: 132>>
+Das Ergebnis ist 132.<|eos|>
+<|user|>Was ist 11 plus 20?<|assistant|><<calc: 11+20>> <<result: 31>>
+Das Ergebnis ist 31.<|eos|>
+<|user|>Was ist 4 mal 8?<|assistant|><<calc: 4*8>> <<result: 32>>
+Das Ergebnis ist 32.<|eos|>
+<|user|>Was ist 13 mal 13?<|assistant|><<calc: 13*13>> <<result: 169>>
+Das Ergebnis ist 169.<|eos|>
+<|user|>Was ist 13 mal 16?<|assistant|><<calc: 13*16>> <<result: 208>>
+Das Ergebnis ist 208.<|eos|>
+<|user|>Was ist 11 plus 9?<|assistant|><<calc: 11+9>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 7 mal 14?<|assistant|><<calc: 7*14>> <<result: 98>>
+Das Ergebnis ist 98.<|eos|>
+<|user|>Was ist 20 plus 12?<|assistant|><<calc: 20+12>> <<result: 32>>
+Das Ergebnis ist 32.<|eos|>
+<|user|>Was ist 10 mal 20?<|assistant|><<calc: 10*20>> <<result: 200>>
+Das Ergebnis ist 200.<|eos|>
+<|user|>Was ist 5 mal 21?<|assistant|><<calc: 5*21>> <<result: 105>>
+Das Ergebnis ist 105.<|eos|>
+<|user|>Was ist 20 plus 20?<|assistant|><<calc: 20+20>> <<result: 40>>
+Das Ergebnis ist 40.<|eos|>
+<|user|>Was ist 15 plus 6?<|assistant|><<calc: 15+6>> <<result: 21>>
+Das Ergebnis ist 21.<|eos|>
+<|user|>Was ist 17 plus 10?<|assistant|><<calc: 17+10>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 13 mal 20?<|assistant|><<calc: 13*20>> <<result: 260>>
+Das Ergebnis ist 260.<|eos|>
+<|user|>Was ist 13 plus 10?<|assistant|><<calc: 13+10>> <<result: 23>>
+Das Ergebnis ist 23.<|eos|>
+<|user|>Was ist 9 plus 10?<|assistant|><<calc: 9+10>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 12 mal 6?<|assistant|><<calc: 12*6>> <<result: 72>>
+Das Ergebnis ist 72.<|eos|>
+<|user|>Was ist 18 plus 13?<|assistant|><<calc: 18+13>> <<result: 31>>
+Das Ergebnis ist 31.<|eos|>
+<|user|>Was ist 8 mal 18?<|assistant|><<calc: 8*18>> <<result: 144>>
+Das Ergebnis ist 144.<|eos|>
+<|user|>Was ist 11 plus 17?<|assistant|><<calc: 11+17>> <<result: 28>>
+Das Ergebnis ist 28.<|eos|>
+<|user|>Was ist 8 plus 7?<|assistant|><<calc: 8+7>> <<result: 15>>
+Das Ergebnis ist 15.<|eos|>
+<|user|>Was ist 7 plus 17?<|assistant|><<calc: 7+17>> <<result: 24>>
+Das Ergebnis ist 24.<|eos|>
+<|user|>Was ist 9 mal 10?<|assistant|><<calc: 9*10>> <<result: 90>>
+Das Ergebnis ist 90.<|eos|>
+<|user|>Was ist 20 mal 10?<|assistant|><<calc: 20*10>> <<result: 200>>
+Das Ergebnis ist 200.<|eos|>
+<|user|>Was ist 17 plus 12?<|assistant|><<calc: 17+12>> <<result: 29>>
+Das Ergebnis ist 29.<|eos|>
+<|user|>Was ist 13 plus 6?<|assistant|><<calc: 13+6>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 19 plus 13?<|assistant|><<calc: 19+13>> <<result: 32>>
+Das Ergebnis ist 32.<|eos|>
+<|user|>Was ist 16 mal 9?<|assistant|><<calc: 16*9>> <<result: 144>>
+Das Ergebnis ist 144.<|eos|>
+<|user|>Was ist 5 mal 6?<|assistant|><<calc: 5*6>> <<result: 30>>
+Das Ergebnis ist 30.<|eos|>
+<|user|>Was ist 11 mal 13?<|assistant|><<calc: 11*13>> <<result: 143>>
+Das Ergebnis ist 143.<|eos|>
+<|user|>Was ist 18 plus 11?<|assistant|><<calc: 18+11>> <<result: 29>>
+Das Ergebnis ist 29.<|eos|>
+<|user|>Was ist 19 mal 11?<|assistant|><<calc: 19*11>> <<result: 209>>
+Das Ergebnis ist 209.<|eos|>
+<|user|>Was ist 4 mal 4?<|assistant|><<calc: 4*4>> <<result: 16>>
+Das Ergebnis ist 16.<|eos|>
+<|user|>Was ist 17 mal 7?<|assistant|><<calc: 17*7>> <<result: 119>>
+Das Ergebnis ist 119.<|eos|>
+<|user|>Was ist 18 plus 19?<|assistant|><<calc: 18+19>> <<result: 37>>
+Das Ergebnis ist 37.<|eos|>
+<|user|>Was ist 12 mal 5?<|assistant|><<calc: 12*5>> <<result: 60>>
+Das Ergebnis ist 60.<|eos|>
+<|user|>Was ist 5 mal 18?<|assistant|><<calc: 5*18>> <<result: 90>>
+Das Ergebnis ist 90.<|eos|>
+<|user|>Was ist 5 plus 5?<|assistant|><<calc: 5+5>> <<result: 10>>
+Das Ergebnis ist 10.<|eos|>
+<|user|>Was ist 15 plus 14?<|assistant|><<calc: 15+14>> <<result: 29>>
+Das Ergebnis ist 29.<|eos|>
+<|user|>Was ist 20 mal 3?<|assistant|><<calc: 20*3>> <<result: 60>>
+Das Ergebnis ist 60.<|eos|>
+<|user|>Was ist 8 plus 13?<|assistant|><<calc: 8+13>> <<result: 21>>
+Das Ergebnis ist 21.<|eos|>
+<|user|>Was ist 5 plus 17?<|assistant|><<calc: 5+17>> <<result: 22>>
+Das Ergebnis ist 22.<|eos|>
+<|user|>Was ist 9 plus 12?<|assistant|><<calc: 9+12>> <<result: 21>>
+Das Ergebnis ist 21.<|eos|>
+<|user|>Was ist 7 mal 16?<|assistant|><<calc: 7*16>> <<result: 112>>
+Das Ergebnis ist 112.<|eos|>
+<|user|>Was ist 13 mal 16?<|assistant|><<calc: 13*16>> <<result: 208>>
+Das Ergebnis ist 208.<|eos|>
+<|user|>Was ist 2 plus 20?<|assistant|><<calc: 2+20>> <<result: 22>>
+Das Ergebnis ist 22.<|eos|>
+<|user|>Was ist 14 plus 16?<|assistant|><<calc: 14+16>> <<result: 30>>
+Das Ergebnis ist 30.<|eos|>
+<|user|>Was ist 20 mal 20?<|assistant|><<calc: 20*20>> <<result: 400>>
+Das Ergebnis ist 400.<|eos|>
+<|user|>Was ist 19 mal 3?<|assistant|><<calc: 19*3>> <<result: 57>>
+Das Ergebnis ist 57.<|eos|>
+<|user|>Was ist 13 mal 18?<|assistant|><<calc: 13*18>> <<result: 234>>
+Das Ergebnis ist 234.<|eos|>
+<|user|>Was ist 20 mal 4?<|assistant|><<calc: 20*4>> <<result: 80>>
+Das Ergebnis ist 80.<|eos|>
+<|user|>Was ist 21 plus 15?<|assistant|><<calc: 21+15>> <<result: 36>>
+Das Ergebnis ist 36.<|eos|>
+<|user|>Was ist 14 mal 7?<|assistant|><<calc: 14*7>> <<result: 98>>
+Das Ergebnis ist 98.<|eos|>
+<|user|>Was ist 15 mal 15?<|assistant|><<calc: 15*15>> <<result: 225>>
+Das Ergebnis ist 225.<|eos|>
+<|user|>Was ist 16 mal 8?<|assistant|><<calc: 16*8>> <<result: 128>>
+Das Ergebnis ist 128.<|eos|>
+<|user|>Was ist 20 plus 3?<|assistant|><<calc: 20+3>> <<result: 23>>
+Das Ergebnis ist 23.<|eos|>
+<|user|>Was ist 9 mal 18?<|assistant|><<calc: 9*18>> <<result: 162>>
+Das Ergebnis ist 162.<|eos|>
+<|user|>Was ist 6 plus 8?<|assistant|><<calc: 6+8>> <<result: 14>>
+Das Ergebnis ist 14.<|eos|>
+<|user|>Was ist 12 plus 14?<|assistant|><<calc: 12+14>> <<result: 26>>
+Das Ergebnis ist 26.<|eos|>
+<|user|>Was ist 10 plus 3?<|assistant|><<calc: 10+3>> <<result: 13>>
+Das Ergebnis ist 13.<|eos|>
+<|user|>Was ist 6 plus 16?<|assistant|><<calc: 6+16>> <<result: 22>>
+Das Ergebnis ist 22.<|eos|>
+<|user|>Was ist 11 mal 10?<|assistant|><<calc: 11*10>> <<result: 110>>
+Das Ergebnis ist 110.<|eos|>
+<|user|>Was ist 16 mal 9?<|assistant|><<calc: 16*9>> <<result: 144>>
+Das Ergebnis ist 144.<|eos|>
+<|user|>Was ist 8 mal 20?<|assistant|><<calc: 8*20>> <<result: 160>>
+Das Ergebnis ist 160.<|eos|>
+<|user|>Was ist 9 mal 7?<|assistant|><<calc: 9*7>> <<result: 63>>
+Das Ergebnis ist 63.<|eos|>
+<|user|>Was ist 9 plus 20?<|assistant|><<calc: 9+20>> <<result: 29>>
+Das Ergebnis ist 29.<|eos|>
+<|user|>Was ist 17 plus 21?<|assistant|><<calc: 17+21>> <<result: 38>>
+Das Ergebnis ist 38.<|eos|>
+<|user|>Was ist 9 mal 10?<|assistant|><<calc: 9*10>> <<result: 90>>
+Das Ergebnis ist 90.<|eos|>
+<|user|>Was ist 19 plus 19?<|assistant|><<calc: 19+19>> <<result: 38>>
+Das Ergebnis ist 38.<|eos|>
+<|user|>Was ist 12 plus 4?<|assistant|><<calc: 12+4>> <<result: 16>>
+Das Ergebnis ist 16.<|eos|>
+<|user|>Was ist 18 mal 12?<|assistant|><<calc: 18*12>> <<result: 216>>
+Das Ergebnis ist 216.<|eos|>
+<|user|>Was ist 11 mal 14?<|assistant|><<calc: 11*14>> <<result: 154>>
+Das Ergebnis ist 154.<|eos|>
+<|user|>Was ist 9 plus 11?<|assistant|><<calc: 9+11>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 19 mal 13?<|assistant|><<calc: 19*13>> <<result: 247>>
+Das Ergebnis ist 247.<|eos|>
+<|user|>Was ist 6 mal 2?<|assistant|><<calc: 6*2>> <<result: 12>>
+Das Ergebnis ist 12.<|eos|>
+<|user|>Was ist 2 plus 10?<|assistant|><<calc: 2+10>> <<result: 12>>
+Das Ergebnis ist 12.<|eos|>
+<|user|>Was ist 19 plus 2?<|assistant|><<calc: 19+2>> <<result: 21>>
+Das Ergebnis ist 21.<|eos|>
+<|user|>Was ist 3 plus 17?<|assistant|><<calc: 3+17>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 4 mal 11?<|assistant|><<calc: 4*11>> <<result: 44>>
+Das Ergebnis ist 44.<|eos|>
+<|user|>Was ist 8 mal 7?<|assistant|><<calc: 8*7>> <<result: 56>>
+Das Ergebnis ist 56.<|eos|>
+<|user|>Was ist 2 mal 7?<|assistant|><<calc: 2*7>> <<result: 14>>
+Das Ergebnis ist 14.<|eos|>
+<|user|>Was ist 13 plus 12?<|assistant|><<calc: 13+12>> <<result: 25>>
+Das Ergebnis ist 25.<|eos|>
+<|user|>Was ist 17 mal 14?<|assistant|><<calc: 17*14>> <<result: 238>>
+Das Ergebnis ist 238.<|eos|>
+<|user|>Was ist 21 plus 16?<|assistant|><<calc: 21+16>> <<result: 37>>
+Das Ergebnis ist 37.<|eos|>
+<|user|>Was ist 20 plus 18?<|assistant|><<calc: 20+18>> <<result: 38>>
+Das Ergebnis ist 38.<|eos|>
+<|user|>Was ist 6 mal 17?<|assistant|><<calc: 6*17>> <<result: 102>>
+Das Ergebnis ist 102.<|eos|>
+<|user|>Was ist 8 mal 4?<|assistant|><<calc: 8*4>> <<result: 32>>
+Das Ergebnis ist 32.<|eos|>
+<|user|>Was ist 18 plus 8?<|assistant|><<calc: 18+8>> <<result: 26>>
+Das Ergebnis ist 26.<|eos|>
+<|user|>Was ist 2 plus 2?<|assistant|><<calc: 2+2>> <<result: 4>>
+Das Ergebnis ist 4.<|eos|>
+<|user|>Was ist 4 mal 17?<|assistant|><<calc: 4*17>> <<result: 68>>
+Das Ergebnis ist 68.<|eos|>
+<|user|>Was ist 10 mal 3?<|assistant|><<calc: 10*3>> <<result: 30>>
+Das Ergebnis ist 30.<|eos|>
+<|user|>Was ist 2 mal 5?<|assistant|><<calc: 2*5>> <<result: 10>>
+Das Ergebnis ist 10.<|eos|>
+<|user|>Was ist 14 mal 13?<|assistant|><<calc: 14*13>> <<result: 182>>
+Das Ergebnis ist 182.<|eos|>
+<|user|>Was ist 12 mal 9?<|assistant|><<calc: 12*9>> <<result: 108>>
+Das Ergebnis ist 108.<|eos|>
+<|user|>Was ist 4 plus 11?<|assistant|><<calc: 4+11>> <<result: 15>>
+Das Ergebnis ist 15.<|eos|>
+<|user|>Was ist 21 plus 9?<|assistant|><<calc: 21+9>> <<result: 30>>
+Das Ergebnis ist 30.<|eos|>
+<|user|>Was ist 15 mal 17?<|assistant|><<calc: 15*17>> <<result: 255>>
+Das Ergebnis ist 255.<|eos|>
+<|user|>Was ist 8 plus 19?<|assistant|><<calc: 8+19>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 3 mal 20?<|assistant|><<calc: 3*20>> <<result: 60>>
+Das Ergebnis ist 60.<|eos|>
+<|user|>Was ist 5 mal 4?<|assistant|><<calc: 5*4>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 20 plus 5?<|assistant|><<calc: 20+5>> <<result: 25>>
+Das Ergebnis ist 25.<|eos|>
+<|user|>Was ist 21 plus 18?<|assistant|><<calc: 21+18>> <<result: 39>>
+Das Ergebnis ist 39.<|eos|>
+<|user|>Was ist 15 mal 14?<|assistant|><<calc: 15*14>> <<result: 210>>
+Das Ergebnis ist 210.<|eos|>
+<|user|>Was ist 16 mal 2?<|assistant|><<calc: 16*2>> <<result: 32>>
+Das Ergebnis ist 32.<|eos|>
+<|user|>Was ist 8 mal 13?<|assistant|><<calc: 8*13>> <<result: 104>>
+Das Ergebnis ist 104.<|eos|>
+<|user|>Was ist 17 mal 16?<|assistant|><<calc: 17*16>> <<result: 272>>
+Das Ergebnis ist 272.<|eos|>
+<|user|>Was ist 13 plus 20?<|assistant|><<calc: 13+20>> <<result: 33>>
+Das Ergebnis ist 33.<|eos|>
+<|user|>Was ist 6 mal 5?<|assistant|><<calc: 6*5>> <<result: 30>>
+Das Ergebnis ist 30.<|eos|>
+<|user|>Was ist 2 plus 3?<|assistant|><<calc: 2+3>> <<result: 5>>
+Das Ergebnis ist 5.<|eos|>
+<|user|>Was ist 8 plus 19?<|assistant|><<calc: 8+19>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 21 plus 20?<|assistant|><<calc: 21+20>> <<result: 41>>
+Das Ergebnis ist 41.<|eos|>
+<|user|>Was ist 16 mal 12?<|assistant|><<calc: 16*12>> <<result: 192>>
+Das Ergebnis ist 192.<|eos|>
+<|user|>Was ist 9 mal 14?<|assistant|><<calc: 9*14>> <<result: 126>>
+Das Ergebnis ist 126.<|eos|>
+<|user|>Was ist 12 plus 19?<|assistant|><<calc: 12+19>> <<result: 31>>
+Das Ergebnis ist 31.<|eos|>
+<|user|>Was ist 14 mal 8?<|assistant|><<calc: 14*8>> <<result: 112>>
+Das Ergebnis ist 112.<|eos|>
+<|user|>Was ist 3 mal 20?<|assistant|><<calc: 3*20>> <<result: 60>>
+Das Ergebnis ist 60.<|eos|>
+<|user|>Was ist 15 plus 19?<|assistant|><<calc: 15+19>> <<result: 34>>
+Das Ergebnis ist 34.<|eos|>
+<|user|>Was ist 21 plus 6?<|assistant|><<calc: 21+6>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 6 plus 13?<|assistant|><<calc: 6+13>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 9 mal 11?<|assistant|><<calc: 9*11>> <<result: 99>>
+Das Ergebnis ist 99.<|eos|>
+<|user|>Was ist 13 plus 13?<|assistant|><<calc: 13+13>> <<result: 26>>
+Das Ergebnis ist 26.<|eos|>
+<|user|>Was ist 13 mal 19?<|assistant|><<calc: 13*19>> <<result: 247>>
+Das Ergebnis ist 247.<|eos|>
+<|user|>Was ist 9 mal 16?<|assistant|><<calc: 9*16>> <<result: 144>>
+Das Ergebnis ist 144.<|eos|>
+<|user|>Was ist 6 mal 19?<|assistant|><<calc: 6*19>> <<result: 114>>
+Das Ergebnis ist 114.<|eos|>
+<|user|>Was ist 18 mal 3?<|assistant|><<calc: 18*3>> <<result: 54>>
+Das Ergebnis ist 54.<|eos|>
+<|user|>Was ist 14 plus 17?<|assistant|><<calc: 14+17>> <<result: 31>>
+Das Ergebnis ist 31.<|eos|>
+<|user|>Was ist 2 mal 14?<|assistant|><<calc: 2*14>> <<result: 28>>
+Das Ergebnis ist 28.<|eos|>
+<|user|>Was ist 15 mal 21?<|assistant|><<calc: 15*21>> <<result: 315>>
+Das Ergebnis ist 315.<|eos|>
+<|user|>Was ist 17 plus 12?<|assistant|><<calc: 17+12>> <<result: 29>>
+Das Ergebnis ist 29.<|eos|>
+<|user|>Was ist 18 plus 2?<|assistant|><<calc: 18+2>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 15 plus 4?<|assistant|><<calc: 15+4>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 2 plus 5?<|assistant|><<calc: 2+5>> <<result: 7>>
+Das Ergebnis ist 7.<|eos|>
+<|user|>Was ist 2 plus 11?<|assistant|><<calc: 2+11>> <<result: 13>>
+Das Ergebnis ist 13.<|eos|>
+<|user|>Was ist 13 plus 7?<|assistant|><<calc: 13+7>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 13 plus 8?<|assistant|><<calc: 13+8>> <<result: 21>>
+Das Ergebnis ist 21.<|eos|>
+<|user|>Was ist 5 mal 7?<|assistant|><<calc: 5*7>> <<result: 35>>
+Das Ergebnis ist 35.<|eos|>
+<|user|>Was ist 19 mal 20?<|assistant|><<calc: 19*20>> <<result: 380>>
+Das Ergebnis ist 380.<|eos|>
+<|user|>Was ist 5 mal 2?<|assistant|><<calc: 5*2>> <<result: 10>>
+Das Ergebnis ist 10.<|eos|>
+<|user|>Was ist 7 mal 15?<|assistant|><<calc: 7*15>> <<result: 105>>
+Das Ergebnis ist 105.<|eos|>
+<|user|>Was ist 16 plus 7?<|assistant|><<calc: 16+7>> <<result: 23>>
+Das Ergebnis ist 23.<|eos|>
+<|user|>Was ist 6 mal 15?<|assistant|><<calc: 6*15>> <<result: 90>>
+Das Ergebnis ist 90.<|eos|>
+<|user|>Was ist 17 mal 14?<|assistant|><<calc: 17*14>> <<result: 238>>
+Das Ergebnis ist 238.<|eos|>
+<|user|>Was ist 8 mal 13?<|assistant|><<calc: 8*13>> <<result: 104>>
+Das Ergebnis ist 104.<|eos|>
+<|user|>Was ist 2 plus 5?<|assistant|><<calc: 2+5>> <<result: 7>>
+Das Ergebnis ist 7.<|eos|>
+<|user|>Was ist 7 plus 11?<|assistant|><<calc: 7+11>> <<result: 18>>
+Das Ergebnis ist 18.<|eos|>
+<|user|>Was ist 6 plus 15?<|assistant|><<calc: 6+15>> <<result: 21>>
+Das Ergebnis ist 21.<|eos|>
+<|user|>Was ist 8 mal 9?<|assistant|><<calc: 8*9>> <<result: 72>>
+Das Ergebnis ist 72.<|eos|>
+<|user|>Was ist 4 mal 4?<|assistant|><<calc: 4*4>> <<result: 16>>
+Das Ergebnis ist 16.<|eos|>
+<|user|>Was ist 2 plus 12?<|assistant|><<calc: 2+12>> <<result: 14>>
+Das Ergebnis ist 14.<|eos|>
+<|user|>Was ist 19 plus 16?<|assistant|><<calc: 19+16>> <<result: 35>>
+Das Ergebnis ist 35.<|eos|>
+<|user|>Was ist 6 plus 2?<|assistant|><<calc: 6+2>> <<result: 8>>
+Das Ergebnis ist 8.<|eos|>
+<|user|>Was ist 9 plus 10?<|assistant|><<calc: 9+10>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 4 plus 10?<|assistant|><<calc: 4+10>> <<result: 14>>
+Das Ergebnis ist 14.<|eos|>
+<|user|>Was ist 20 mal 13?<|assistant|><<calc: 20*13>> <<result: 260>>
+Das Ergebnis ist 260.<|eos|>
+<|user|>Was ist 4 mal 7?<|assistant|><<calc: 4*7>> <<result: 28>>
+Das Ergebnis ist 28.<|eos|>
+<|user|>Was ist 8 mal 13?<|assistant|><<calc: 8*13>> <<result: 104>>
+Das Ergebnis ist 104.<|eos|>
+<|user|>Was ist 12 mal 2?<|assistant|><<calc: 12*2>> <<result: 24>>
+Das Ergebnis ist 24.<|eos|>
+<|user|>Was ist 6 mal 14?<|assistant|><<calc: 6*14>> <<result: 84>>
+Das Ergebnis ist 84.<|eos|>
+<|user|>Was ist 3 mal 16?<|assistant|><<calc: 3*16>> <<result: 48>>
+Das Ergebnis ist 48.<|eos|>
+<|user|>Was ist 13 plus 14?<|assistant|><<calc: 13+14>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 19 mal 14?<|assistant|><<calc: 19*14>> <<result: 266>>
+Das Ergebnis ist 266.<|eos|>
+<|user|>Was ist 17 mal 3?<|assistant|><<calc: 17*3>> <<result: 51>>
+Das Ergebnis ist 51.<|eos|>
+<|user|>Was ist 20 plus 8?<|assistant|><<calc: 20+8>> <<result: 28>>
+Das Ergebnis ist 28.<|eos|>
+<|user|>Was ist 18 plus 9?<|assistant|><<calc: 18+9>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 18 mal 2?<|assistant|><<calc: 18*2>> <<result: 36>>
+Das Ergebnis ist 36.<|eos|>
+<|user|>Was ist 19 mal 18?<|assistant|><<calc: 19*18>> <<result: 342>>
+Das Ergebnis ist 342.<|eos|>
+<|user|>Was ist 18 plus 6?<|assistant|><<calc: 18+6>> <<result: 24>>
+Das Ergebnis ist 24.<|eos|>
+<|user|>Was ist 13 mal 5?<|assistant|><<calc: 13*5>> <<result: 65>>
+Das Ergebnis ist 65.<|eos|>
+<|user|>Was ist 12 plus 3?<|assistant|><<calc: 12+3>> <<result: 15>>
+Das Ergebnis ist 15.<|eos|>
+<|user|>Was ist 3 plus 11?<|assistant|><<calc: 3+11>> <<result: 14>>
+Das Ergebnis ist 14.<|eos|>
+<|user|>Was ist 13 plus 18?<|assistant|><<calc: 13+18>> <<result: 31>>
+Das Ergebnis ist 31.<|eos|>
+<|user|>Was ist 15 plus 15?<|assistant|><<calc: 15+15>> <<result: 30>>
+Das Ergebnis ist 30.<|eos|>
+<|user|>Was ist 17 plus 10?<|assistant|><<calc: 17+10>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 16 plus 5?<|assistant|><<calc: 16+5>> <<result: 21>>
+Das Ergebnis ist 21.<|eos|>
+<|user|>Was ist 14 plus 4?<|assistant|><<calc: 14+4>> <<result: 18>>
+Das Ergebnis ist 18.<|eos|>
+<|user|>Was ist 17 mal 2?<|assistant|><<calc: 17*2>> <<result: 34>>
+Das Ergebnis ist 34.<|eos|>
+<|user|>Was ist 10 plus 19?<|assistant|><<calc: 10+19>> <<result: 29>>
+Das Ergebnis ist 29.<|eos|>
+<|user|>Was ist 14 mal 10?<|assistant|><<calc: 14*10>> <<result: 140>>
+Das Ergebnis ist 140.<|eos|>
+<|user|>Was ist 14 mal 17?<|assistant|><<calc: 14*17>> <<result: 238>>
+Das Ergebnis ist 238.<|eos|>
+<|user|>Was ist 19 plus 6?<|assistant|><<calc: 19+6>> <<result: 25>>
+Das Ergebnis ist 25.<|eos|>
+<|user|>Was ist 17 mal 7?<|assistant|><<calc: 17*7>> <<result: 119>>
+Das Ergebnis ist 119.<|eos|>
+<|user|>Was ist 17 mal 11?<|assistant|><<calc: 17*11>> <<result: 187>>
+Das Ergebnis ist 187.<|eos|>
+<|user|>Was ist 6 plus 9?<|assistant|><<calc: 6+9>> <<result: 15>>
+Das Ergebnis ist 15.<|eos|>
+<|user|>Was ist 7 plus 2?<|assistant|><<calc: 7+2>> <<result: 9>>
+Das Ergebnis ist 9.<|eos|>
+<|user|>Was ist 11 plus 21?<|assistant|><<calc: 11+21>> <<result: 32>>
+Das Ergebnis ist 32.<|eos|>
+<|user|>Was ist 5 mal 4?<|assistant|><<calc: 5*4>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 11 mal 21?<|assistant|><<calc: 11*21>> <<result: 231>>
+Das Ergebnis ist 231.<|eos|>
+<|user|>Was ist 11 plus 15?<|assistant|><<calc: 11+15>> <<result: 26>>
+Das Ergebnis ist 26.<|eos|>
+<|user|>Was ist 3 mal 14?<|assistant|><<calc: 3*14>> <<result: 42>>
+Das Ergebnis ist 42.<|eos|>
+<|user|>Was ist 9 mal 5?<|assistant|><<calc: 9*5>> <<result: 45>>
+Das Ergebnis ist 45.<|eos|>
+<|user|>Was ist 17 mal 11?<|assistant|><<calc: 17*11>> <<result: 187>>
+Das Ergebnis ist 187.<|eos|>
+<|user|>Was ist 18 plus 15?<|assistant|><<calc: 18+15>> <<result: 33>>
+Das Ergebnis ist 33.<|eos|>
+<|user|>Was ist 7 plus 17?<|assistant|><<calc: 7+17>> <<result: 24>>
+Das Ergebnis ist 24.<|eos|>
+<|user|>Was ist 17 mal 7?<|assistant|><<calc: 17*7>> <<result: 119>>
+Das Ergebnis ist 119.<|eos|>
+<|user|>Was ist 5 mal 18?<|assistant|><<calc: 5*18>> <<result: 90>>
+Das Ergebnis ist 90.<|eos|>
+<|user|>Was ist 11 mal 10?<|assistant|><<calc: 11*10>> <<result: 110>>
+Das Ergebnis ist 110.<|eos|>
+<|user|>Was ist 3 mal 9?<|assistant|><<calc: 3*9>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 9 plus 7?<|assistant|><<calc: 9+7>> <<result: 16>>
+Das Ergebnis ist 16.<|eos|>
+<|user|>Was ist 3 plus 6?<|assistant|><<calc: 3+6>> <<result: 9>>
+Das Ergebnis ist 9.<|eos|>
+<|user|>Was ist 8 mal 5?<|assistant|><<calc: 8*5>> <<result: 40>>
+Das Ergebnis ist 40.<|eos|>
+<|user|>Was ist 11 plus 14?<|assistant|><<calc: 11+14>> <<result: 25>>
+Das Ergebnis ist 25.<|eos|>
+<|user|>Was ist 10 mal 10?<|assistant|><<calc: 10*10>> <<result: 100>>
+Das Ergebnis ist 100.<|eos|>
+<|user|>Was ist 13 plus 13?<|assistant|><<calc: 13+13>> <<result: 26>>
+Das Ergebnis ist 26.<|eos|>
+<|user|>Was ist 4 mal 20?<|assistant|><<calc: 4*20>> <<result: 80>>
+Das Ergebnis ist 80.<|eos|>
+<|user|>Was ist 19 mal 12?<|assistant|><<calc: 19*12>> <<result: 228>>
+Das Ergebnis ist 228.<|eos|>
+<|user|>Was ist 13 mal 5?<|assistant|><<calc: 13*5>> <<result: 65>>
+Das Ergebnis ist 65.<|eos|>
+<|user|>Was ist 6 plus 14?<|assistant|><<calc: 6+14>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 10 mal 15?<|assistant|><<calc: 10*15>> <<result: 150>>
+Das Ergebnis ist 150.<|eos|>
+<|user|>Was ist 2 plus 11?<|assistant|><<calc: 2+11>> <<result: 13>>
+Das Ergebnis ist 13.<|eos|>
+<|user|>Was ist 2 plus 17?<|assistant|><<calc: 2+17>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 19 mal 8?<|assistant|><<calc: 19*8>> <<result: 152>>
+Das Ergebnis ist 152.<|eos|>
+<|user|>Was ist 17 plus 7?<|assistant|><<calc: 17+7>> <<result: 24>>
+Das Ergebnis ist 24.<|eos|>
+<|user|>Was ist 5 plus 13?<|assistant|><<calc: 5+13>> <<result: 18>>
+Das Ergebnis ist 18.<|eos|>
+<|user|>Was ist 4 mal 15?<|assistant|><<calc: 4*15>> <<result: 60>>
+Das Ergebnis ist 60.<|eos|>
+<|user|>Was ist 7 plus 7?<|assistant|><<calc: 7+7>> <<result: 14>>
+Das Ergebnis ist 14.<|eos|>
+<|user|>Was ist 2 plus 15?<|assistant|><<calc: 2+15>> <<result: 17>>
+Das Ergebnis ist 17.<|eos|>
+<|user|>Was ist 21 plus 16?<|assistant|><<calc: 21+16>> <<result: 37>>
+Das Ergebnis ist 37.<|eos|>
+<|user|>Was ist 9 mal 15?<|assistant|><<calc: 9*15>> <<result: 135>>
+Das Ergebnis ist 135.<|eos|>
+<|user|>Was ist 15 mal 15?<|assistant|><<calc: 15*15>> <<result: 225>>
+Das Ergebnis ist 225.<|eos|>
+<|user|>Was ist 17 plus 10?<|assistant|><<calc: 17+10>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 17 plus 2?<|assistant|><<calc: 17+2>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 20 plus 8?<|assistant|><<calc: 20+8>> <<result: 28>>
+Das Ergebnis ist 28.<|eos|>
+<|user|>Was ist 20 plus 17?<|assistant|><<calc: 20+17>> <<result: 37>>
+Das Ergebnis ist 37.<|eos|>
+<|user|>Was ist 9 plus 18?<|assistant|><<calc: 9+18>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 21 plus 10?<|assistant|><<calc: 21+10>> <<result: 31>>
+Das Ergebnis ist 31.<|eos|>
+<|user|>Was ist 4 mal 15?<|assistant|><<calc: 4*15>> <<result: 60>>
+Das Ergebnis ist 60.<|eos|>
+<|user|>Was ist 18 mal 14?<|assistant|><<calc: 18*14>> <<result: 252>>
+Das Ergebnis ist 252.<|eos|>
+<|user|>Was ist 16 mal 8?<|assistant|><<calc: 16*8>> <<result: 128>>
+Das Ergebnis ist 128.<|eos|>
+<|user|>Was ist 9 plus 10?<|assistant|><<calc: 9+10>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 4 plus 4?<|assistant|><<calc: 4+4>> <<result: 8>>
+Das Ergebnis ist 8.<|eos|>
+<|user|>Was ist 13 plus 10?<|assistant|><<calc: 13+10>> <<result: 23>>
+Das Ergebnis ist 23.<|eos|>
+<|user|>Was ist 5 mal 9?<|assistant|><<calc: 5*9>> <<result: 45>>
+Das Ergebnis ist 45.<|eos|>
+<|user|>Was ist 6 mal 19?<|assistant|><<calc: 6*19>> <<result: 114>>
+Das Ergebnis ist 114.<|eos|>
+<|user|>Was ist 2 plus 12?<|assistant|><<calc: 2+12>> <<result: 14>>
+Das Ergebnis ist 14.<|eos|>
+<|user|>Was ist 15 plus 6?<|assistant|><<calc: 15+6>> <<result: 21>>
+Das Ergebnis ist 21.<|eos|>
+<|user|>Was ist 8 plus 6?<|assistant|><<calc: 8+6>> <<result: 14>>
+Das Ergebnis ist 14.<|eos|>
+<|user|>Was ist 8 plus 4?<|assistant|><<calc: 8+4>> <<result: 12>>
+Das Ergebnis ist 12.<|eos|>
+<|user|>Was ist 11 mal 2?<|assistant|><<calc: 11*2>> <<result: 22>>
+Das Ergebnis ist 22.<|eos|>
+<|user|>Was ist 7 mal 16?<|assistant|><<calc: 7*16>> <<result: 112>>
+Das Ergebnis ist 112.<|eos|>
+<|user|>Was ist 3 plus 6?<|assistant|><<calc: 3+6>> <<result: 9>>
+Das Ergebnis ist 9.<|eos|>
+<|user|>Was ist 21 plus 8?<|assistant|><<calc: 21+8>> <<result: 29>>
+Das Ergebnis ist 29.<|eos|>
+<|user|>Was ist 17 plus 9?<|assistant|><<calc: 17+9>> <<result: 26>>
+Das Ergebnis ist 26.<|eos|>
+<|user|>Was ist 12 plus 5?<|assistant|><<calc: 12+5>> <<result: 17>>
+Das Ergebnis ist 17.<|eos|>
+<|user|>Was ist 21 mal 17?<|assistant|><<calc: 21*17>> <<result: 357>>
+Das Ergebnis ist 357.<|eos|>
+<|user|>Was ist 5 mal 5?<|assistant|><<calc: 5*5>> <<result: 25>>
+Das Ergebnis ist 25.<|eos|>
+<|user|>Was ist 15 mal 12?<|assistant|><<calc: 15*12>> <<result: 180>>
+Das Ergebnis ist 180.<|eos|>
+<|user|>Was ist 21 plus 15?<|assistant|><<calc: 21+15>> <<result: 36>>
+Das Ergebnis ist 36.<|eos|>
+<|user|>Was ist 16 mal 3?<|assistant|><<calc: 16*3>> <<result: 48>>
+Das Ergebnis ist 48.<|eos|>
+<|user|>Was ist 12 plus 8?<|assistant|><<calc: 12+8>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 12 mal 8?<|assistant|><<calc: 12*8>> <<result: 96>>
+Das Ergebnis ist 96.<|eos|>
+<|user|>Was ist 5 mal 7?<|assistant|><<calc: 5*7>> <<result: 35>>
+Das Ergebnis ist 35.<|eos|>
+<|user|>Was ist 10 mal 12?<|assistant|><<calc: 10*12>> <<result: 120>>
+Das Ergebnis ist 120.<|eos|>
+<|user|>Was ist 16 mal 2?<|assistant|><<calc: 16*2>> <<result: 32>>
+Das Ergebnis ist 32.<|eos|>
+<|user|>Was ist 14 mal 14?<|assistant|><<calc: 14*14>> <<result: 196>>
+Das Ergebnis ist 196.<|eos|>
+<|user|>Was ist 4 mal 2?<|assistant|><<calc: 4*2>> <<result: 8>>
+Das Ergebnis ist 8.<|eos|>
+<|user|>Was ist 8 mal 9?<|assistant|><<calc: 8*9>> <<result: 72>>
+Das Ergebnis ist 72.<|eos|>
+<|user|>Was ist 17 plus 3?<|assistant|><<calc: 17+3>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 2 plus 14?<|assistant|><<calc: 2+14>> <<result: 16>>
+Das Ergebnis ist 16.<|eos|>
+<|user|>Was ist 13 plus 17?<|assistant|><<calc: 13+17>> <<result: 30>>
+Das Ergebnis ist 30.<|eos|>
+<|user|>Was ist 7 mal 13?<|assistant|><<calc: 7*13>> <<result: 91>>
+Das Ergebnis ist 91.<|eos|>
+<|user|>Was ist 17 mal 18?<|assistant|><<calc: 17*18>> <<result: 306>>
+Das Ergebnis ist 306.<|eos|>
+<|user|>Was ist 17 plus 21?<|assistant|><<calc: 17+21>> <<result: 38>>
+Das Ergebnis ist 38.<|eos|>
+<|user|>Was ist 17 plus 21?<|assistant|><<calc: 17+21>> <<result: 38>>
+Das Ergebnis ist 38.<|eos|>
+<|user|>Was ist 10 plus 10?<|assistant|><<calc: 10+10>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 8 plus 20?<|assistant|><<calc: 8+20>> <<result: 28>>
+Das Ergebnis ist 28.<|eos|>
+<|user|>Was ist 9 mal 10?<|assistant|><<calc: 9*10>> <<result: 90>>
+Das Ergebnis ist 90.<|eos|>
+<|user|>Was ist 10 plus 19?<|assistant|><<calc: 10+19>> <<result: 29>>
+Das Ergebnis ist 29.<|eos|>
+<|user|>Was ist 20 plus 6?<|assistant|><<calc: 20+6>> <<result: 26>>
+Das Ergebnis ist 26.<|eos|>
+<|user|>Was ist 17 mal 19?<|assistant|><<calc: 17*19>> <<result: 323>>
+Das Ergebnis ist 323.<|eos|>
+<|user|>Was ist 8 mal 9?<|assistant|><<calc: 8*9>> <<result: 72>>
+Das Ergebnis ist 72.<|eos|>
+<|user|>Was ist 6 plus 6?<|assistant|><<calc: 6+6>> <<result: 12>>
+Das Ergebnis ist 12.<|eos|>
+<|user|>Was ist 3 mal 6?<|assistant|><<calc: 3*6>> <<result: 18>>
+Das Ergebnis ist 18.<|eos|>
+<|user|>Was ist 12 plus 11?<|assistant|><<calc: 12+11>> <<result: 23>>
+Das Ergebnis ist 23.<|eos|>
+<|user|>Was ist 20 plus 7?<|assistant|><<calc: 20+7>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 9 plus 11?<|assistant|><<calc: 9+11>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 11 plus 12?<|assistant|><<calc: 11+12>> <<result: 23>>
+Das Ergebnis ist 23.<|eos|>
+<|user|>Was ist 9 plus 8?<|assistant|><<calc: 9+8>> <<result: 17>>
+Das Ergebnis ist 17.<|eos|>
+<|user|>Was ist 2 plus 10?<|assistant|><<calc: 2+10>> <<result: 12>>
+Das Ergebnis ist 12.<|eos|>
+<|user|>Was ist 17 plus 10?<|assistant|><<calc: 17+10>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 12 mal 9?<|assistant|><<calc: 12*9>> <<result: 108>>
+Das Ergebnis ist 108.<|eos|>
+<|user|>Was ist 8 plus 7?<|assistant|><<calc: 8+7>> <<result: 15>>
+Das Ergebnis ist 15.<|eos|>
+<|user|>Was ist 7 mal 9?<|assistant|><<calc: 7*9>> <<result: 63>>
+Das Ergebnis ist 63.<|eos|>
+<|user|>Was ist 13 plus 20?<|assistant|><<calc: 13+20>> <<result: 33>>
+Das Ergebnis ist 33.<|eos|>
+<|user|>Was ist 9 plus 4?<|assistant|><<calc: 9+4>> <<result: 13>>
+Das Ergebnis ist 13.<|eos|>
+<|user|>Was ist 5 mal 10?<|assistant|><<calc: 5*10>> <<result: 50>>
+Das Ergebnis ist 50.<|eos|>
+<|user|>Was ist 6 mal 11?<|assistant|><<calc: 6*11>> <<result: 66>>
+Das Ergebnis ist 66.<|eos|>
+<|user|>Was ist 17 plus 10?<|assistant|><<calc: 17+10>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 12 plus 13?<|assistant|><<calc: 12+13>> <<result: 25>>
+Das Ergebnis ist 25.<|eos|>
+<|user|>Was ist 16 plus 6?<|assistant|><<calc: 16+6>> <<result: 22>>
+Das Ergebnis ist 22.<|eos|>
+<|user|>Was ist 6 mal 20?<|assistant|><<calc: 6*20>> <<result: 120>>
+Das Ergebnis ist 120.<|eos|>
+<|user|>Was ist 9 plus 5?<|assistant|><<calc: 9+5>> <<result: 14>>
+Das Ergebnis ist 14.<|eos|>
+<|user|>Was ist 14 plus 3?<|assistant|><<calc: 14+3>> <<result: 17>>
+Das Ergebnis ist 17.<|eos|>
+<|user|>Was ist 12 mal 5?<|assistant|><<calc: 12*5>> <<result: 60>>
+Das Ergebnis ist 60.<|eos|>
+<|user|>Was ist 11 plus 8?<|assistant|><<calc: 11+8>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 5 plus 18?<|assistant|><<calc: 5+18>> <<result: 23>>
+Das Ergebnis ist 23.<|eos|>
+<|user|>Was ist 6 plus 3?<|assistant|><<calc: 6+3>> <<result: 9>>
+Das Ergebnis ist 9.<|eos|>
+<|user|>Was ist 21 mal 17?<|assistant|><<calc: 21*17>> <<result: 357>>
+Das Ergebnis ist 357.<|eos|>
+<|user|>Was ist 5 plus 3?<|assistant|><<calc: 5+3>> <<result: 8>>
+Das Ergebnis ist 8.<|eos|>
+<|user|>Was ist 20 plus 20?<|assistant|><<calc: 20+20>> <<result: 40>>
+Das Ergebnis ist 40.<|eos|>
+<|user|>Was ist 15 mal 13?<|assistant|><<calc: 15*13>> <<result: 195>>
+Das Ergebnis ist 195.<|eos|>
+<|user|>Was ist 17 mal 21?<|assistant|><<calc: 17*21>> <<result: 357>>
+Das Ergebnis ist 357.<|eos|>
+<|user|>Was ist 12 plus 20?<|assistant|><<calc: 12+20>> <<result: 32>>
+Das Ergebnis ist 32.<|eos|>
+<|user|>Was ist 8 mal 20?<|assistant|><<calc: 8*20>> <<result: 160>>
+Das Ergebnis ist 160.<|eos|>
+<|user|>Was ist 5 plus 4?<|assistant|><<calc: 5+4>> <<result: 9>>
+Das Ergebnis ist 9.<|eos|>
+<|user|>Was ist 21 plus 10?<|assistant|><<calc: 21+10>> <<result: 31>>
+Das Ergebnis ist 31.<|eos|>
+<|user|>Was ist 10 mal 7?<|assistant|><<calc: 10*7>> <<result: 70>>
+Das Ergebnis ist 70.<|eos|>
+<|user|>Was ist 16 mal 2?<|assistant|><<calc: 16*2>> <<result: 32>>
+Das Ergebnis ist 32.<|eos|>
+<|user|>Was ist 5 plus 5?<|assistant|><<calc: 5+5>> <<result: 10>>
+Das Ergebnis ist 10.<|eos|>
+<|user|>Was ist 17 plus 14?<|assistant|><<calc: 17+14>> <<result: 31>>
+Das Ergebnis ist 31.<|eos|>
+<|user|>Was ist 18 mal 3?<|assistant|><<calc: 18*3>> <<result: 54>>
+Das Ergebnis ist 54.<|eos|>
+<|user|>Was ist 10 plus 7?<|assistant|><<calc: 10+7>> <<result: 17>>
+Das Ergebnis ist 17.<|eos|>
+<|user|>Was ist 18 plus 18?<|assistant|><<calc: 18+18>> <<result: 36>>
+Das Ergebnis ist 36.<|eos|>
+<|user|>Was ist 6 plus 2?<|assistant|><<calc: 6+2>> <<result: 8>>
+Das Ergebnis ist 8.<|eos|>
+<|user|>Was ist 8 mal 19?<|assistant|><<calc: 8*19>> <<result: 152>>
+Das Ergebnis ist 152.<|eos|>
+<|user|>Was ist 12 plus 13?<|assistant|><<calc: 12+13>> <<result: 25>>
+Das Ergebnis ist 25.<|eos|>
+<|user|>Was ist 12 plus 2?<|assistant|><<calc: 12+2>> <<result: 14>>
+Das Ergebnis ist 14.<|eos|>
+<|user|>Was ist 4 plus 14?<|assistant|><<calc: 4+14>> <<result: 18>>
+Das Ergebnis ist 18.<|eos|>
+<|user|>Was ist 13 mal 14?<|assistant|><<calc: 13*14>> <<result: 182>>
+Das Ergebnis ist 182.<|eos|>
+<|user|>Was ist 20 plus 2?<|assistant|><<calc: 20+2>> <<result: 22>>
+Das Ergebnis ist 22.<|eos|>
+<|user|>Was ist 13 plus 6?<|assistant|><<calc: 13+6>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 10 mal 7?<|assistant|><<calc: 10*7>> <<result: 70>>
+Das Ergebnis ist 70.<|eos|>
+<|user|>Was ist 15 mal 3?<|assistant|><<calc: 15*3>> <<result: 45>>
+Das Ergebnis ist 45.<|eos|>
+<|user|>Was ist 16 mal 10?<|assistant|><<calc: 16*10>> <<result: 160>>
+Das Ergebnis ist 160.<|eos|>
+<|user|>Was ist 5 mal 17?<|assistant|><<calc: 5*17>> <<result: 85>>
+Das Ergebnis ist 85.<|eos|>
+<|user|>Was ist 12 plus 9?<|assistant|><<calc: 12+9>> <<result: 21>>
+Das Ergebnis ist 21.<|eos|>
+<|user|>Was ist 15 mal 18?<|assistant|><<calc: 15*18>> <<result: 270>>
+Das Ergebnis ist 270.<|eos|>
+<|user|>Was ist 13 mal 17?<|assistant|><<calc: 13*17>> <<result: 221>>
+Das Ergebnis ist 221.<|eos|>
+<|user|>Was ist 20 plus 6?<|assistant|><<calc: 20+6>> <<result: 26>>
+Das Ergebnis ist 26.<|eos|>
+<|user|>Was ist 14 plus 12?<|assistant|><<calc: 14+12>> <<result: 26>>
+Das Ergebnis ist 26.<|eos|>
+<|user|>Was ist 19 plus 16?<|assistant|><<calc: 19+16>> <<result: 35>>
+Das Ergebnis ist 35.<|eos|>
+<|user|>Was ist 3 plus 20?<|assistant|><<calc: 3+20>> <<result: 23>>
+Das Ergebnis ist 23.<|eos|>
+<|user|>Was ist 13 plus 4?<|assistant|><<calc: 13+4>> <<result: 17>>
+Das Ergebnis ist 17.<|eos|>
+<|user|>Was ist 3 mal 11?<|assistant|><<calc: 3*11>> <<result: 33>>
+Das Ergebnis ist 33.<|eos|>
+<|user|>Was ist 9 mal 20?<|assistant|><<calc: 9*20>> <<result: 180>>
+Das Ergebnis ist 180.<|eos|>
+<|user|>Was ist 18 mal 15?<|assistant|><<calc: 18*15>> <<result: 270>>
+Das Ergebnis ist 270.<|eos|>
+<|user|>Was ist 11 mal 9?<|assistant|><<calc: 11*9>> <<result: 99>>
+Das Ergebnis ist 99.<|eos|>
+<|user|>Was ist 5 mal 15?<|assistant|><<calc: 5*15>> <<result: 75>>
+Das Ergebnis ist 75.<|eos|>
+<|user|>Was ist 10 plus 9?<|assistant|><<calc: 10+9>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 2 mal 18?<|assistant|><<calc: 2*18>> <<result: 36>>
+Das Ergebnis ist 36.<|eos|>
+<|user|>Was ist 4 plus 11?<|assistant|><<calc: 4+11>> <<result: 15>>
+Das Ergebnis ist 15.<|eos|>
+<|user|>Was ist 19 plus 21?<|assistant|><<calc: 19+21>> <<result: 40>>
+Das Ergebnis ist 40.<|eos|>
+<|user|>Was ist 4 mal 3?<|assistant|><<calc: 4*3>> <<result: 12>>
+Das Ergebnis ist 12.<|eos|>
+<|user|>Was ist 19 plus 21?<|assistant|><<calc: 19+21>> <<result: 40>>
+Das Ergebnis ist 40.<|eos|>
+<|user|>Was ist 4 mal 21?<|assistant|><<calc: 4*21>> <<result: 84>>
+Das Ergebnis ist 84.<|eos|>
+<|user|>Was ist 8 mal 10?<|assistant|><<calc: 8*10>> <<result: 80>>
+Das Ergebnis ist 80.<|eos|>
+<|user|>Was ist 3 plus 17?<|assistant|><<calc: 3+17>> <<result: 20>>
+Das Ergebnis ist 20.<|eos|>
+<|user|>Was ist 6 mal 14?<|assistant|><<calc: 6*14>> <<result: 84>>
+Das Ergebnis ist 84.<|eos|>
+<|user|>Was ist 14 mal 4?<|assistant|><<calc: 14*4>> <<result: 56>>
+Das Ergebnis ist 56.<|eos|>
+<|user|>Was ist 16 mal 12?<|assistant|><<calc: 16*12>> <<result: 192>>
+Das Ergebnis ist 192.<|eos|>
+<|user|>Was ist 3 mal 13?<|assistant|><<calc: 3*13>> <<result: 39>>
+Das Ergebnis ist 39.<|eos|>
+<|user|>Was ist 4 mal 11?<|assistant|><<calc: 4*11>> <<result: 44>>
+Das Ergebnis ist 44.<|eos|>
+<|user|>Was ist 21 plus 7?<|assistant|><<calc: 21+7>> <<result: 28>>
+Das Ergebnis ist 28.<|eos|>
+<|user|>Was ist 11 plus 12?<|assistant|><<calc: 11+12>> <<result: 23>>
+Das Ergebnis ist 23.<|eos|>
+<|user|>Was ist 6 plus 17?<|assistant|><<calc: 6+17>> <<result: 23>>
+Das Ergebnis ist 23.<|eos|>
+<|user|>Was ist 9 plus 13?<|assistant|><<calc: 9+13>> <<result: 22>>
+Das Ergebnis ist 22.<|eos|>
+<|user|>Was ist 19 mal 18?<|assistant|><<calc: 19*18>> <<result: 342>>
+Das Ergebnis ist 342.<|eos|>
+<|user|>Was ist 18 plus 13?<|assistant|><<calc: 18+13>> <<result: 31>>
+Das Ergebnis ist 31.<|eos|>
+<|user|>Was ist 7 mal 7?<|assistant|><<calc: 7*7>> <<result: 49>>
+Das Ergebnis ist 49.<|eos|>
+<|user|>Was ist 12 mal 13?<|assistant|><<calc: 12*13>> <<result: 156>>
+Das Ergebnis ist 156.<|eos|>
+<|user|>Was ist 15 mal 21?<|assistant|><<calc: 15*21>> <<result: 315>>
+Das Ergebnis ist 315.<|eos|>
+<|user|>Was ist 6 plus 12?<|assistant|><<calc: 6+12>> <<result: 18>>
+Das Ergebnis ist 18.<|eos|>
+<|user|>Was ist 16 plus 15?<|assistant|><<calc: 16+15>> <<result: 31>>
+Das Ergebnis ist 31.<|eos|>
+<|user|>Was ist 21 plus 12?<|assistant|><<calc: 21+12>> <<result: 33>>
+Das Ergebnis ist 33.<|eos|>
+<|user|>Was ist 12 plus 9?<|assistant|><<calc: 12+9>> <<result: 21>>
+Das Ergebnis ist 21.<|eos|>
+<|user|>Was ist 5 mal 13?<|assistant|><<calc: 5*13>> <<result: 65>>
+Das Ergebnis ist 65.<|eos|>
+<|user|>Was ist 17 mal 11?<|assistant|><<calc: 17*11>> <<result: 187>>
+Das Ergebnis ist 187.<|eos|>
+<|user|>Was ist 3 plus 5?<|assistant|><<calc: 3+5>> <<result: 8>>
+Das Ergebnis ist 8.<|eos|>
+<|user|>Was ist 3 plus 11?<|assistant|><<calc: 3+11>> <<result: 14>>
+Das Ergebnis ist 14.<|eos|>
+<|user|>Was ist 2 mal 18?<|assistant|><<calc: 2*18>> <<result: 36>>
+Das Ergebnis ist 36.<|eos|>
+<|user|>Was ist 8 mal 5?<|assistant|><<calc: 8*5>> <<result: 40>>
+Das Ergebnis ist 40.<|eos|>
+<|user|>Was ist 4 plus 7?<|assistant|><<calc: 4+7>> <<result: 11>>
+Das Ergebnis ist 11.<|eos|>
+<|user|>Was ist 13 mal 5?<|assistant|><<calc: 13*5>> <<result: 65>>
+Das Ergebnis ist 65.<|eos|>
+<|user|>Was ist 10 plus 18?<|assistant|><<calc: 10+18>> <<result: 28>>
+Das Ergebnis ist 28.<|eos|>
+<|user|>Was ist 10 plus 12?<|assistant|><<calc: 10+12>> <<result: 22>>
+Das Ergebnis ist 22.<|eos|>
+<|user|>Was ist 14 plus 9?<|assistant|><<calc: 14+9>> <<result: 23>>
+Das Ergebnis ist 23.<|eos|>
+<|user|>Was ist 4 plus 8?<|assistant|><<calc: 4+8>> <<result: 12>>
+Das Ergebnis ist 12.<|eos|>
+<|user|>Was ist 21 plus 14?<|assistant|><<calc: 21+14>> <<result: 35>>
+Das Ergebnis ist 35.<|eos|>
+<|user|>Was ist 21 plus 7?<|assistant|><<calc: 21+7>> <<result: 28>>
+Das Ergebnis ist 28.<|eos|>
+<|user|>Was ist 17 plus 20?<|assistant|><<calc: 17+20>> <<result: 37>>
+Das Ergebnis ist 37.<|eos|>
+<|user|>Was ist 14 mal 5?<|assistant|><<calc: 14*5>> <<result: 70>>
+Das Ergebnis ist 70.<|eos|>
+<|user|>Was ist 3 plus 16?<|assistant|><<calc: 3+16>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 4 mal 14?<|assistant|><<calc: 4*14>> <<result: 56>>
+Das Ergebnis ist 56.<|eos|>
+<|user|>Was ist 21 plus 3?<|assistant|><<calc: 21+3>> <<result: 24>>
+Das Ergebnis ist 24.<|eos|>
+<|user|>Was ist 10 plus 2?<|assistant|><<calc: 10+2>> <<result: 12>>
+Das Ergebnis ist 12.<|eos|>
+<|user|>Was ist 5 plus 11?<|assistant|><<calc: 5+11>> <<result: 16>>
+Das Ergebnis ist 16.<|eos|>
+<|user|>Was ist 3 mal 9?<|assistant|><<calc: 3*9>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 5 mal 21?<|assistant|><<calc: 5*21>> <<result: 105>>
+Das Ergebnis ist 105.<|eos|>
+<|user|>Was ist 14 plus 17?<|assistant|><<calc: 14+17>> <<result: 31>>
+Das Ergebnis ist 31.<|eos|>
+<|user|>Was ist 20 mal 18?<|assistant|><<calc: 20*18>> <<result: 360>>
+Das Ergebnis ist 360.<|eos|>
+<|user|>Was ist 20 plus 7?<|assistant|><<calc: 20+7>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 9 mal 13?<|assistant|><<calc: 9*13>> <<result: 117>>
+Das Ergebnis ist 117.<|eos|>
+<|user|>Was ist 16 mal 20?<|assistant|><<calc: 16*20>> <<result: 320>>
+Das Ergebnis ist 320.<|eos|>
+<|user|>Was ist 18 plus 20?<|assistant|><<calc: 18+20>> <<result: 38>>
+Das Ergebnis ist 38.<|eos|>
+<|user|>Was ist 18 mal 15?<|assistant|><<calc: 18*15>> <<result: 270>>
+Das Ergebnis ist 270.<|eos|>
+<|user|>Was ist 11 plus 15?<|assistant|><<calc: 11+15>> <<result: 26>>
+Das Ergebnis ist 26.<|eos|>
+<|user|>Was ist 10 plus 7?<|assistant|><<calc: 10+7>> <<result: 17>>
+Das Ergebnis ist 17.<|eos|>
+<|user|>Was ist 16 plus 11?<|assistant|><<calc: 16+11>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 5 plus 14?<|assistant|><<calc: 5+14>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 7 mal 3?<|assistant|><<calc: 7*3>> <<result: 21>>
+Das Ergebnis ist 21.<|eos|>
+<|user|>Was ist 17 plus 6?<|assistant|><<calc: 17+6>> <<result: 23>>
+Das Ergebnis ist 23.<|eos|>
+<|user|>Was ist 3 mal 11?<|assistant|><<calc: 3*11>> <<result: 33>>
+Das Ergebnis ist 33.<|eos|>
+<|user|>Was ist 19 plus 19?<|assistant|><<calc: 19+19>> <<result: 38>>
+Das Ergebnis ist 38.<|eos|>
+<|user|>Was ist 2 plus 7?<|assistant|><<calc: 2+7>> <<result: 9>>
+Das Ergebnis ist 9.<|eos|>
+<|user|>Was ist 9 plus 16?<|assistant|><<calc: 9+16>> <<result: 25>>
+Das Ergebnis ist 25.<|eos|>
+<|user|>Was ist 13 mal 6?<|assistant|><<calc: 13*6>> <<result: 78>>
+Das Ergebnis ist 78.<|eos|>
+<|user|>Was ist 7 plus 14?<|assistant|><<calc: 7+14>> <<result: 21>>
+Das Ergebnis ist 21.<|eos|>
+<|user|>Was ist 10 plus 16?<|assistant|><<calc: 10+16>> <<result: 26>>
+Das Ergebnis ist 26.<|eos|>
+<|user|>Was ist 13 plus 16?<|assistant|><<calc: 13+16>> <<result: 29>>
+Das Ergebnis ist 29.<|eos|>
+<|user|>Was ist 5 mal 21?<|assistant|><<calc: 5*21>> <<result: 105>>
+Das Ergebnis ist 105.<|eos|>
+<|user|>Was ist 8 mal 16?<|assistant|><<calc: 8*16>> <<result: 128>>
+Das Ergebnis ist 128.<|eos|>
+<|user|>Was ist 13 plus 12?<|assistant|><<calc: 13+12>> <<result: 25>>
+Das Ergebnis ist 25.<|eos|>
+<|user|>Was ist 10 plus 3?<|assistant|><<calc: 10+3>> <<result: 13>>
+Das Ergebnis ist 13.<|eos|>
+<|user|>Was ist 14 mal 16?<|assistant|><<calc: 14*16>> <<result: 224>>
+Das Ergebnis ist 224.<|eos|>
+<|user|>Was ist 20 mal 17?<|assistant|><<calc: 20*17>> <<result: 340>>
+Das Ergebnis ist 340.<|eos|>
+<|user|>Was ist 10 mal 3?<|assistant|><<calc: 10*3>> <<result: 30>>
+Das Ergebnis ist 30.<|eos|>
+<|user|>Was ist 5 mal 6?<|assistant|><<calc: 5*6>> <<result: 30>>
+Das Ergebnis ist 30.<|eos|>
+<|user|>Was ist 16 mal 17?<|assistant|><<calc: 16*17>> <<result: 272>>
+Das Ergebnis ist 272.<|eos|>
+<|user|>Was ist 12 mal 6?<|assistant|><<calc: 12*6>> <<result: 72>>
+Das Ergebnis ist 72.<|eos|>
+<|user|>Was ist 12 mal 13?<|assistant|><<calc: 12*13>> <<result: 156>>
+Das Ergebnis ist 156.<|eos|>
+<|user|>Was ist 4 plus 20?<|assistant|><<calc: 4+20>> <<result: 24>>
+Das Ergebnis ist 24.<|eos|>
+<|user|>Was ist 8 plus 4?<|assistant|><<calc: 8+4>> <<result: 12>>
+Das Ergebnis ist 12.<|eos|>
+<|user|>Was ist 13 mal 20?<|assistant|><<calc: 13*20>> <<result: 260>>
+Das Ergebnis ist 260.<|eos|>
+<|user|>Was ist 21 plus 9?<|assistant|><<calc: 21+9>> <<result: 30>>
+Das Ergebnis ist 30.<|eos|>
+<|user|>Was ist 9 plus 15?<|assistant|><<calc: 9+15>> <<result: 24>>
+Das Ergebnis ist 24.<|eos|>
+<|user|>Was ist 14 plus 11?<|assistant|><<calc: 14+11>> <<result: 25>>
+Das Ergebnis ist 25.<|eos|>
+<|user|>Was ist 9 mal 10?<|assistant|><<calc: 9*10>> <<result: 90>>
+Das Ergebnis ist 90.<|eos|>
+<|user|>Was ist 12 mal 4?<|assistant|><<calc: 12*4>> <<result: 48>>
+Das Ergebnis ist 48.<|eos|>
+<|user|>Was ist 2 plus 12?<|assistant|><<calc: 2+12>> <<result: 14>>
+Das Ergebnis ist 14.<|eos|>
+<|user|>Was ist 12 mal 8?<|assistant|><<calc: 12*8>> <<result: 96>>
+Das Ergebnis ist 96.<|eos|>
+<|user|>Was ist 3 mal 14?<|assistant|><<calc: 3*14>> <<result: 42>>
+Das Ergebnis ist 42.<|eos|>
+<|user|>Was ist 8 plus 16?<|assistant|><<calc: 8+16>> <<result: 24>>
+Das Ergebnis ist 24.<|eos|>
+<|user|>Was ist 20 plus 12?<|assistant|><<calc: 20+12>> <<result: 32>>
+Das Ergebnis ist 32.<|eos|>
+<|user|>Was ist 10 plus 5?<|assistant|><<calc: 10+5>> <<result: 15>>
+Das Ergebnis ist 15.<|eos|>
+<|user|>Was ist 14 mal 20?<|assistant|><<calc: 14*20>> <<result: 280>>
+Das Ergebnis ist 280.<|eos|>
+<|user|>Was ist 8 mal 4?<|assistant|><<calc: 8*4>> <<result: 32>>
+Das Ergebnis ist 32.<|eos|>
+<|user|>Was ist 13 plus 17?<|assistant|><<calc: 13+17>> <<result: 30>>
+Das Ergebnis ist 30.<|eos|>
+<|user|>Was ist 15 plus 14?<|assistant|><<calc: 15+14>> <<result: 29>>
+Das Ergebnis ist 29.<|eos|>
+<|user|>Was ist 16 plus 14?<|assistant|><<calc: 16+14>> <<result: 30>>
+Das Ergebnis ist 30.<|eos|>
+<|user|>Was ist 6 plus 21?<|assistant|><<calc: 6+21>> <<result: 27>>
+Das Ergebnis ist 27.<|eos|>
+<|user|>Was ist 7 plus 12?<|assistant|><<calc: 7+12>> <<result: 19>>
+Das Ergebnis ist 19.<|eos|>
+<|user|>Was ist 18 plus 13?<|assistant|><<calc: 18+13>> <<result: 31>>
+Das Ergebnis ist 31.<|eos|>
+<|user|>Was ist 19 plus 7?<|assistant|><<calc: 19+7>> <<result: 26>>
+Das Ergebnis ist 26.<|eos|>
+<|user|>Was ist 9 mal 21?<|assistant|><<calc: 9*21>> <<result: 189>>
+Das Ergebnis ist 189.<|eos|>
+<|user|>Was ist 6 mal 11?<|assistant|><<calc: 6*11>> <<result: 66>>
+Das Ergebnis ist 66.<|eos|>
+<|user|>Was ist 19 plus 14?<|assistant|><<calc: 19+14>> <<result: 33>>
+Das Ergebnis ist 33.<|eos|>
+<|user|>Was ist 13 mal 3?<|assistant|><<calc: 13*3>> <<result: 39>>
+Das Ergebnis ist 39.<|eos|>
+<|user|>Was ist 11 plus 14?<|assistant|><<calc: 11+14>> <<result: 25>>
+Das Ergebnis ist 25.<|eos|>

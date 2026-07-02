@@ -40,6 +40,7 @@ type
     FPos: Integer;
     FKCache, FVCache: TArray<TArray<Single>>; // [Layer][SeqLen*C]
     FX, FXn, FAttOut, FQkv, FHid, FLogits, FRouter: TArray<Single>;
+    FExpertHist: TArray<Int64>; // routing counts per expert ("areas")
     procedure Attention(L: Integer);
     procedure FfnExpert(L, E: Integer; Gate: Single);
   public
@@ -50,16 +51,27 @@ type
     function VocabSize: Integer; override;
     function MaxContext: Integer; override;
     function Position: Integer; override;
+    { Which thematic areas answered: router decisions per expert,
+      accumulated over all tokens and layers since Reset }
+    property ExpertHistogram: TArray<Int64> read FExpertHist;
   end;
 
   { Generator + verification scoring; works against the abstractions,
     so it handles both Prism AND GGUF models. }
+  { Tool handler: receives the expression inside <<calc: ...>> and
+    returns the exact result (or an error text) to inject }
+  TToolHandler = reference to function(const Call: string): string;
+
   TGenerator = class
   private
     FBackend: TLlmBackend;
     FEngine: TLlmEngine;
     FRng: TRng;
     function SampleToken(const SP: TSamplingParams): Integer;
+    function GenerateCore(const PromptTokens: TArray<Integer>;
+      const SP: TSamplingParams; const OnToken: TProc<string>;
+      out Usage: TUsage; OutTokens: TList<Integer>;
+      const ToolHandler: TToolHandler): string;
   public
     constructor Create(ABackend: TLlmBackend);
     destructor Destroy; override;
@@ -68,6 +80,12 @@ type
     function Generate(const PromptTokens: TArray<Integer>;
       const SP: TSamplingParams; const OnToken: TProc<string>;
       out Usage: TUsage; OutTokens: TList<Integer> = nil): string;
+    { Like Generate, but with tool calling: when the model emits
+      <<calc: EXPR>>, the handler result is injected as <<result: ...>>
+      into the output AND the model context, then generation continues }
+    function GenerateWithTools(const PromptTokens: TArray<Integer>;
+      const SP: TSamplingParams; const OnToken: TProc<string>;
+      out Usage: TUsage; const ToolHandler: TToolHandler): string;
     { Sum of ln P(cont | ctx) - basis for perplexity/critic score }
     function ScoreContinuation(const Ctx, Cont: TArray<Integer>): Double;
     function Perplexity(const Ctx, Cont: TArray<Integer>): Double;
@@ -136,6 +154,8 @@ begin
     SetLength(FKCache[L], Int64(FProv.Config.SeqLen) * FProv.Config.Dim);
     SetLength(FVCache[L], Int64(FProv.Config.SeqLen) * FProv.Config.Dim);
   end;
+  FExpertHist := nil;
+  SetLength(FExpertHist, Max(1, FProv.Config.NumExperts));
 end;
 
 function TPrismEngine.Logits: TArray<Single>;
@@ -275,6 +295,7 @@ begin
         if FRouter[E] > FRouter[BestE] then
           BestE := E;
       Gate := FRouter[BestE];
+      Inc(FExpertHist[BestE]);
       FfnExpert(L, BestE, Gate);
     end
     else
@@ -372,15 +393,31 @@ begin
   end;
 end;
 
-function TGenerator.Generate(const PromptTokens: TArray<Integer>;
+function TGenerator.GenerateCore(const PromptTokens: TArray<Integer>;
   const SP: TSamplingParams; const OnToken: TProc<string>;
-  out Usage: TUsage; OutTokens: TList<Integer>): string;
+  out Usage: TUsage; OutTokens: TList<Integer>;
+  const ToolHandler: TToolHandler): string;
+const
+  TOOL_OPEN = '<<calc:';
+  TOOL_CLOSE = '>>';
+  MAX_TOOL_CALLS = 8;
 var
-  Prompt: TArray<Integer>;
+  Prompt, InjTokens: TArray<Integer>;
   I, N, Tok, MaxCtx, KeepLen, FlushLen: Integer;
   Buf, Piece: TBytes;
   SB: TStringBuilder;
-  Chunk: string;
+  Chunk, Accum, Expr, Inj: string;
+  ScanPos, A, B, ToolCalls: Integer;
+  ToolsOn: Boolean;
+
+  procedure Emit(const S: string);
+  begin
+    SB.Append(S);
+    Accum := Accum + S;
+    if Assigned(OnToken) then
+      OnToken(S);
+  end;
+
 begin
   MaxCtx := FEngine.MaxContext;
   Prompt := PromptTokens;
@@ -404,6 +441,10 @@ begin
   try
     Buf := nil;
     N := 0;
+    Accum := '';
+    ScanPos := 1;
+    ToolCalls := 0;
+    ToolsOn := Assigned(ToolHandler);
     while (N < SP.MaxTokens) and (FEngine.Position < MaxCtx) do
     begin
       Tok := SampleToken(SP);
@@ -420,28 +461,67 @@ begin
         if FlushLen > 0 then
         begin
           Chunk := TEncoding.UTF8.GetString(Buf, 0, FlushLen);
-          SB.Append(Chunk);
-          if Assigned(OnToken) then
-            OnToken(Chunk);
+          Emit(Chunk);
           Buf := Copy(Buf, FlushLen, Length(Buf) - FlushLen);
         end;
       end;
       if FEngine.Position >= MaxCtx then
         Break;
       FEngine.Step(Tok, True);
+
+      { Tool call: as soon as a complete <<calc: ...>> marker has been
+        emitted, evaluate it and inject <<result: ...>> into both the
+        output and the model context, then continue generating }
+      if ToolsOn then
+      begin
+        A := Pos(TOOL_OPEN, Accum, ScanPos);
+        if A > 0 then
+        begin
+          B := Pos(TOOL_CLOSE, Accum, A + Length(TOOL_OPEN));
+          if B > 0 then
+          begin
+            Expr := Trim(Copy(Accum, A + Length(TOOL_OPEN),
+              B - A - Length(TOOL_OPEN)));
+            Inj := ' <<result: ' + ToolHandler(Expr) + '>>'#10;
+            Emit(Inj);
+            ScanPos := Length(Accum) + 1;
+            Inc(ToolCalls);
+            if ToolCalls >= MAX_TOOL_CALLS then
+              ToolsOn := False;
+            InjTokens := FBackend.Tokenizer.Encode(Inj);
+            for I := 0 to High(InjTokens) do
+            begin
+              if FEngine.Position >= MaxCtx then
+                Break;
+              FEngine.Step(InjTokens[I], I = High(InjTokens));
+            end;
+            if FEngine.Position >= MaxCtx then
+              Break;
+          end;
+        end;
+      end;
     end;
     if Length(Buf) > 0 then
-    begin
-      Chunk := BytesToUtf8Lossy(Buf);
-      SB.Append(Chunk);
-      if Assigned(OnToken) then
-        OnToken(Chunk);
-    end;
+      Emit(BytesToUtf8Lossy(Buf));
     Usage.CompletionTokens := N;
     Result := SB.ToString;
   finally
     SB.Free;
   end;
+end;
+
+function TGenerator.Generate(const PromptTokens: TArray<Integer>;
+  const SP: TSamplingParams; const OnToken: TProc<string>;
+  out Usage: TUsage; OutTokens: TList<Integer>): string;
+begin
+  Result := GenerateCore(PromptTokens, SP, OnToken, Usage, OutTokens, nil);
+end;
+
+function TGenerator.GenerateWithTools(const PromptTokens: TArray<Integer>;
+  const SP: TSamplingParams; const OnToken: TProc<string>;
+  out Usage: TUsage; const ToolHandler: TToolHandler): string;
+begin
+  Result := GenerateCore(PromptTokens, SP, OnToken, Usage, nil, ToolHandler);
 end;
 
 function TGenerator.ScoreContinuation(const Ctx, Cont: TArray<Integer>): Double;

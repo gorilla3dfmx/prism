@@ -18,14 +18,16 @@ interface
 
 uses
   System.SysUtils, System.Math, System.JSON, System.Generics.Collections,
-  Prism.Types, Prism.Inference;
+  Prism.Types, Prism.Inference, Prism.Laws;
 
 type
   TVerificationResult = record
     Perplexity: Double;
     SelfConsistency: Double; // 0..1
     CriticScore: Double;     // 0..1 (P("yes"))
+    LawChecks: TArray<TMathCheck>; // re-computed arithmetic claims
     Verdict: string;         // 'pass' | 'warn' | 'fail'
+    function LawFailed: Integer;
     function ToJson: TJSONObject;
   end;
 
@@ -48,13 +50,46 @@ implementation
 
 { TVerificationResult }
 
+function TVerificationResult.LawFailed: Integer;
+var
+  C: TMathCheck;
+begin
+  Result := 0;
+  for C in LawChecks do
+    if not C.Passed then
+      Inc(Result);
+end;
+
 function TVerificationResult.ToJson: TJSONObject;
+var
+  LC: TJSONObject;
+  Det: TJSONArray;
+  C: TMathCheck;
+  S: string;
 begin
   Result := TJSONObject.Create;
   Result.AddPair('perplexity', TJSONNumber.Create(RoundTo(Perplexity, -3)));
   Result.AddPair('self_consistency',
     TJSONNumber.Create(RoundTo(SelfConsistency, -3)));
   Result.AddPair('critic_score', TJSONNumber.Create(RoundTo(CriticScore, -3)));
+  if Length(LawChecks) > 0 then
+  begin
+    LC := TJSONObject.Create;
+    LC.AddPair('total', TJSONNumber.Create(Length(LawChecks)));
+    LC.AddPair('passed', TJSONNumber.Create(Length(LawChecks) - LawFailed));
+    LC.AddPair('failed', TJSONNumber.Create(LawFailed));
+    Det := TJSONArray.Create;
+    for C in LawChecks do
+    begin
+      if C.Passed then
+        S := C.Claim + '  [ok]'
+      else
+        S := C.Claim + '  [FAIL: expected ' + FormatValue(C.Expected) + ']';
+      Det.Add(S);
+    end;
+    LC.AddPair('details', Det);
+    Result.AddPair('law_checks', LC);
+  end;
   Result.AddPair('verdict', Verdict);
 end;
 
@@ -171,7 +206,22 @@ begin
     Gen.Free;
   end;
 
-  if (Result.Perplexity > PplFail) or (Result.CriticScore < MinCritic / 2) then
+  { 4. Law-grounded check: re-compute arithmetic claims in the answer.
+    Deterministic falsification overrides the statistical signals. }
+  Result.LawChecks := CheckMathClaims(AnswerText);
+
+  if Result.LawFailed > 0 then
+    Result.Verdict := 'fail'
+  else if Length(Result.LawChecks) > 0 then
+  begin
+    { all stated calculations verified exactly -> laws beat statistics }
+    if Result.Perplexity <= PplWarn then
+      Result.Verdict := 'pass'
+    else
+      Result.Verdict := 'warn';
+  end
+  else if (Result.Perplexity > PplFail) or
+    (Result.CriticScore < MinCritic / 2) then
     Result.Verdict := 'fail'
   else if (Result.Perplexity <= PplWarn) and
     (Result.SelfConsistency >= MinConsistency) and
