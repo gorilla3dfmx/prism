@@ -33,6 +33,11 @@ uses
   Prism.Llama in '..\src\Prism.Llama.pas',
   Prism.Inference in '..\src\Prism.Inference.pas';
 
+const
+  PHASE_NAME: array [TLlamaPhase] of string = (
+    'Embed', 'RmsNorm', 'Bias', 'RoPE', 'KV-Kopie', 'Attention', 'SiLU+Mul',
+    'Residual');
+
 type
   TShapeStat = record
     Rows, Cols: Integer;
@@ -95,6 +100,8 @@ var
   Wall: TStopwatch;
   WallMs, InMs, OutMs: Double;
   Txt: string;
+  Ph: TLlamaPhase;
+  SumPhases: Double;
   I, L: Integer;
   S: TShapeStat;
   Lay: TLlamaLayer;
@@ -151,6 +158,7 @@ begin
 
         SP.MaxTokens := NTok;
         GTicks := 0; GCalls := 0; GStats.Clear;
+        FillChar(TLlamaEngine.PhaseTicks, SizeOf(TLlamaEngine.PhaseTicks), 0);
         GOn := True;
         Wall := TStopwatch.StartNew;
         Txt := Gen.Generate(Prompt, SP, nil, Usage);
@@ -160,6 +168,9 @@ begin
         Writeln('--- Antwort (zum Draufschauen, ob das Modell noch Sinn redet) ---');
         Writeln(Copy(Txt, 1, 400));
 
+        SumPhases := 0;
+        for Ph := Low(TLlamaPhase) to High(TLlamaPhase) do
+          SumPhases := SumPhases + Ms(TLlamaEngine.PhaseTicks[Ph]);
         WallMs := Wall.Elapsed.TotalMilliseconds;
         InMs := Ms(GTicks);
         OutMs := WallMs - InMs;
@@ -176,6 +187,14 @@ begin
           (Usage.PromptTokens + Usage.CompletionTokens)]));
         Writeln(Format('Kosten je MatVec        %8.3f ms', [InMs / GCalls]));
 
+        Writeln;
+        Writeln('=== CPU-Abschnitte ausserhalb von MatVec ===');
+        for Ph := Low(TLlamaPhase) to High(TLlamaPhase) do
+          Writeln(Format('  %-10s %9.1f ms  %6.2f ms/Token  %5.1f %% der Aussenzeit',
+            [PHASE_NAME[Ph], Ms(TLlamaEngine.PhaseTicks[Ph]),
+             Ms(TLlamaEngine.PhaseTicks[Ph]) / (Usage.PromptTokens + Usage.CompletionTokens),
+             100 * Ms(TLlamaEngine.PhaseTicks[Ph]) / OutMs]));
+        Writeln(Format('  %-10s %9.1f ms', ['SUMME', SumPhases]));
         Writeln;
         Writeln('=== nach Form (in der echten Erzeugung) ===');
         Writeln('     Rows x Cols   Aufrufe   ges. ms   je Auf. ms   Anteil');

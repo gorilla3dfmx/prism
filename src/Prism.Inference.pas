@@ -16,7 +16,7 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.Math, System.Generics.Collections,
-  System.Generics.Defaults, System.Threading,
+  System.Generics.Defaults, System.Threading, System.Diagnostics,
   Prism.Types, Prism.Vector, Prism.Model, Prism.Tokenizer, Prism.Gpu;
 
 type
@@ -29,9 +29,22 @@ type
     class function Default: TSamplingParams; static;
   end;
 
+  { Was der Aufruf gekostet hat -- Token UND Zeit.
+
+    Die Trennung von Prefill und Decode ist die eigentliche Aussage: beide
+    skalieren voellig anders. Prefill haengt an der Promptlaenge und laeuft
+    einmal, Decode an der Zahl erzeugter Token. Eine einzelne Gesamtdauer
+    verwischt genau den Unterschied, nach dem man sucht, wenn eine Anfrage
+    zu lange braucht. }
   TUsage = record
     PromptTokens: Integer;
     CompletionTokens: Integer;
+    PrefillMs: Double;   // Prompt einlesen (ohne Erzeugung)
+    DecodeMs: Double;    // Token erzeugen
+    function TotalMs: Double;
+    { Token je Sekunde der ERZEUGUNG -- die Zahl, die man vergleicht.
+      0, wenn nichts erzeugt wurde. }
+    function TokensPerSecond: Double;
   end;
 
   TPrismEngine = class(TLlmEngine)
@@ -111,6 +124,21 @@ type
   end;
 
 implementation
+
+{ TUsage }
+
+function TUsage.TotalMs: Double;
+begin
+  Result := PrefillMs + DecodeMs;
+end;
+
+function TUsage.TokensPerSecond: Double;
+begin
+  if (CompletionTokens > 0) and (DecodeMs > 0) then
+    Result := CompletionTokens * 1000.0 / DecodeMs
+  else
+    Result := 0;
+end;
 
 { TSamplingParams }
 
@@ -558,6 +586,7 @@ var
   Chunk, Accum, Expr, Inj: string;
   ScanPos, A, B, ToolCalls: Integer;
   ToolsOn: Boolean;
+  Clock: TStopwatch;
 
   procedure Emit(const S: string);
   begin
@@ -579,12 +608,17 @@ begin
 
   Usage.PromptTokens := Length(Prompt);
   Usage.CompletionTokens := 0;
+  Usage.PrefillMs := 0;
+  Usage.DecodeMs := 0;
 
+  Clock := TStopwatch.StartNew;
   FEngine.Reset;
   { Prefill: compute logits only for the last prompt token }
   for I := 0 to High(Prompt) - 1 do
     FEngine.Step(Prompt[I], False);
   FEngine.Step(Prompt[High(Prompt)], True);
+  Usage.PrefillMs := Clock.Elapsed.TotalMilliseconds;
+  Clock := TStopwatch.StartNew;
 
   SB := TStringBuilder.Create;
   try
@@ -653,6 +687,9 @@ begin
     if Length(Buf) > 0 then
       Emit(BytesToUtf8Lossy(Buf));
     Usage.CompletionTokens := N;
+    { Einschliesslich der OnToken-Rueckrufe: was der Aufrufer beim Streamen
+      selbst in die Ausgabe steckt, hat der Anfragende auch gewartet. }
+    Usage.DecodeMs := Clock.Elapsed.TotalMilliseconds;
     Result := SB.ToString;
   finally
     SB.Free;

@@ -26,10 +26,19 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.Math, System.SyncObjs,
+  System.Diagnostics,
   System.Generics.Collections, System.Threading,
   Prism.Types, Prism.Vector, Prism.Gguf, Prism.Vulkan;
 
 type
+  { Uhrentakte der CPU-Abschnitte von Step, ausgelesen von tools\PrismProf.
+    Ohne diese Zaehler war nicht zu sagen, was an der CPU-Seite eigentlich
+    teuer ist -- die Vermutung "die Attention rechnet zu lange" lag zweimal
+    daneben. Kosten: acht Zeitabfragen je Schicht, rund 16 us je Token gegen
+    88 ms Gesamtzeit, also 0,02 %. }
+  TLlamaPhase = (lpEmbed, lpNorm, lpBias, lpRope, lpKvCopy, lpAttn, lpSilu,
+    lpResid);
+
   TLlamaConfig = record
     Dim: Integer;          // embedding_length
     NLayers: Integer;
@@ -84,6 +93,9 @@ type
   end;
 
   TLlamaEngine = class(TLlmEngine)
+  public
+    class var PhaseTicks: array [TLlamaPhase] of Int64;
+  private
   private
     FModel: TLlamaModel;
     FPos: Integer;
@@ -430,6 +442,7 @@ var
   L: Integer;
   Lay: TLlamaLayer;
   C, QD, KvD, Ffn: Integer;
+  T0: Int64;
 begin
   if FPos >= FModel.Cfg.CtxLen then
     raise Exception.Create('Context window exhausted.');
@@ -440,44 +453,66 @@ begin
   KvD := FModel.Cfg.KvDim;
   Ffn := FModel.Cfg.FfnDim;
 
+  T0 := TStopwatch.GetTimeStamp;
   FModel.TokenEmbd.DequantRow(Token, @FX[0]);
+  Inc(PhaseTicks[lpEmbed], TStopwatch.GetTimeStamp - T0);
 
   for L := 0 to FModel.Cfg.NLayers - 1 do
   begin
     Lay := FModel.GetLayer(L);
     { Attention }
+    T0 := TStopwatch.GetTimeStamp;
     RmsNormVec(@FXb[0], @FX[0], @Lay.AttnNorm[0], C, FModel.Cfg.RmsEps);
+    Inc(PhaseTicks[lpNorm], TStopwatch.GetTimeStamp - T0);
     Lay.Wq.MatVec(@FQ[0], @FXb[0]);
     Lay.Wk.MatVec(@FK[0], @FXb[0]);
     Lay.Wv.MatVec(@FV[0], @FXb[0]);
+    T0 := TStopwatch.GetTimeStamp;
     if Length(Lay.Bq) > 0 then
       AddVec(@FQ[0], @Lay.Bq[0], QD);
     if Length(Lay.Bk) > 0 then
       AddVec(@FK[0], @Lay.Bk[0], KvD);
     if Length(Lay.Bv) > 0 then
       AddVec(@FV[0], @Lay.Bv[0], KvD);
+    Inc(PhaseTicks[lpBias], TStopwatch.GetTimeStamp - T0);
+    T0 := TStopwatch.GetTimeStamp;
     Rope(@FQ[0], FModel.Cfg.NHeads, FPos);
     Rope(@FK[0], FModel.Cfg.NKvHeads, FPos);
+    Inc(PhaseTicks[lpRope], TStopwatch.GetTimeStamp - T0);
+    T0 := TStopwatch.GetTimeStamp;
     Move(FK[0], FKCache[L][Int64(FPos) * KvD], KvD * SizeOf(Single));
     Move(FV[0], FVCache[L][Int64(FPos) * KvD], KvD * SizeOf(Single));
     FKCacheCur := FKCache[L];
     FVCacheCur := FVCache[L];
+    Inc(PhaseTicks[lpKvCopy], TStopwatch.GetTimeStamp - T0);
+    T0 := TStopwatch.GetTimeStamp;
     Attention;
+    Inc(PhaseTicks[lpAttn], TStopwatch.GetTimeStamp - T0);
     Lay.Wo.MatVec(@FXb[0], @FAttOut[0]);
+    T0 := TStopwatch.GetTimeStamp;
     AddVec(@FX[0], @FXb[0], C);
+    Inc(PhaseTicks[lpResid], TStopwatch.GetTimeStamp - T0);
     { SwiGLU-FFN }
+    T0 := TStopwatch.GetTimeStamp;
     RmsNormVec(@FXb[0], @FX[0], @Lay.FfnNorm[0], C, FModel.Cfg.RmsEps);
+    Inc(PhaseTicks[lpNorm], TStopwatch.GetTimeStamp - T0);
     Lay.WGate.MatVec(@FHb[0], @FXb[0]);
     Lay.WUp.MatVec(@FHb2[0], @FXb[0]);
+    T0 := TStopwatch.GetTimeStamp;
     SiluVec(@FHb[0], Ffn);
     MulVec(@FHb[0], @FHb2[0], Ffn);
+    Inc(PhaseTicks[lpSilu], TStopwatch.GetTimeStamp - T0);
     Lay.WDown.MatVec(@FXb[0], @FHb[0]);
+    T0 := TStopwatch.GetTimeStamp;
     AddVec(@FX[0], @FXb[0], C);
+    Inc(PhaseTicks[lpResid], TStopwatch.GetTimeStamp - T0);
   end;
 
   if NeedLogits then
   begin
+    T0 := TStopwatch.GetTimeStamp;
     RmsNormVec(@FXb[0], @FX[0], @FModel.OutputNorm[0], C, FModel.Cfg.RmsEps);
+    Inc(PhaseTicks[lpNorm], TStopwatch.GetTimeStamp - T0);
     FModel.OutputW.MatVec(@FLogits[0], @FXb[0]);
   end;
   Inc(FPos);

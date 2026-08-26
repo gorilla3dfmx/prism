@@ -13,6 +13,12 @@ unit Prism.RestServer;
     GET  /health                 Status + model info
     POST /api/train              Feed a training sample (text/multimodal)
 
+  Timing in every answer:
+    Ollama endpoints report total_duration / load_duration /
+    prompt_eval_duration / eval_duration in nanoseconds, as Ollama does.
+    OpenAI endpoints carry "x_timings" (total_ms, prompt_ms, eval_ms,
+    tokens_per_second). While streaming, both arrive in the final packet.
+
   Additional fields in chat requests:
     "verify": true  -> self-verification, result in "x_verification"
 
@@ -162,6 +168,44 @@ begin
   V := Obj.GetValue(Key);
   if V is TJSONBool then
     Result := TJSONBool(V).AsBoolean;
+end;
+
+{ Haengt die Zeitmessung an eine Antwort.
+
+  Ollama hat dafuer bereits Felder, und zwar in NANOSEKUNDEN: total_duration,
+  load_duration, prompt_eval_duration, eval_duration. Clients rechnen ihre
+  Token/s daraus aus, also werden genau diese Namen bedient statt eigener --
+  sonst zeigt ein Ollama-Client neben Prism eine leere Geschwindigkeit an.
+  load_duration ist 0: das Modell steht beim ersten Request bereits.
+
+  Fuer OpenAI gibt es kein solches Feld. Dort gilt die Prism-Konvention der
+  x_-Erweiterungen (wie x_verification, x_areas), in Millisekunden, weil das
+  die Einheit ist, in der ueber HTTP-Antwortzeiten geredet wird. }
+procedure AddTimings(Root: TJSONObject; const Usage: TUsage;
+  OllamaStyle: Boolean);
+var
+  T: TJSONObject;
+begin
+  if OllamaStyle then
+  begin
+    Root.AddPair('total_duration',
+      TJSONNumber.Create(Round(Usage.TotalMs * 1e6)));
+    Root.AddPair('load_duration', TJSONNumber.Create(Int64(0)));
+    Root.AddPair('prompt_eval_duration',
+      TJSONNumber.Create(Round(Usage.PrefillMs * 1e6)));
+    Root.AddPair('eval_duration',
+      TJSONNumber.Create(Round(Usage.DecodeMs * 1e6)));
+  end
+  else
+  begin
+    T := TJSONObject.Create;
+    T.AddPair('total_ms', TJSONNumber.Create(Usage.TotalMs));
+    T.AddPair('prompt_ms', TJSONNumber.Create(Usage.PrefillMs));
+    T.AddPair('eval_ms', TJSONNumber.Create(Usage.DecodeMs));
+    T.AddPair('tokens_per_second',
+      TJSONNumber.Create(Usage.TokensPerSecond));
+    Root.AddPair('x_timings', T);
+  end;
 end;
 
 function TemplateFromString(const S: string): TChatTemplate;
@@ -521,6 +565,16 @@ begin
           M.AddPair('content', Content);
           C.AddPair('message', M);
           C.AddPair('done', TJSONBool.Create(Final));
+          { Erst im Schlusspaket -- vorher stehen die Zahlen noch nicht fest.
+            Ollama macht es genauso, Clients erwarten sie dort. }
+          if Final then
+          begin
+            C.AddPair('prompt_eval_count',
+              TJSONNumber.Create(Usage.PromptTokens));
+            C.AddPair('eval_count',
+              TJSONNumber.Create(Usage.CompletionTokens));
+            AddTimings(C, Usage, True);
+          end;
         end
         else
         begin
@@ -541,6 +595,11 @@ begin
             Ch.AddPair('finish_reason', TJSONNull.Create);
           ChArr.AddElement(Ch);
           C.AddPair('choices', ChArr);
+          { OpenAI kennt fuer den Strom kein Zeitfeld -- die Erweiterung reist
+            im Schlusschunk mit, damit ein Stromverbraucher dieselbe Auskunft
+            bekommt wie einer ohne Strom. }
+          if Final then
+            AddTimings(C, Usage, False);
         end;
         Result := C.ToJSON;
       finally
@@ -631,6 +690,7 @@ begin
     Root.AddPair('done', TJSONBool.Create(True));
     Root.AddPair('prompt_eval_count', TJSONNumber.Create(Usage.PromptTokens));
     Root.AddPair('eval_count', TJSONNumber.Create(Usage.CompletionTokens));
+    AddTimings(Root, Usage, True);
   end
   else
   begin
@@ -655,6 +715,7 @@ begin
     UsageObj.AddPair('total_tokens',
       TJSONNumber.Create(Usage.PromptTokens + Usage.CompletionTokens));
     Root.AddPair('usage', UsageObj);
+    AddTimings(Root, Usage, False);
   end;
   if DoVerify then
     Root.AddPair('x_verification', Ver.ToJson);
@@ -715,6 +776,7 @@ begin
   UsageObj.AddPair('total_tokens',
     TJSONNumber.Create(Usage.PromptTokens + Usage.CompletionTokens));
   Root.AddPair('usage', UsageObj);
+  AddTimings(Root, Usage, False);
   SendJson(AResponseInfo, Root);
 end;
 
@@ -742,6 +804,13 @@ begin
         C.AddPair('created_at', IsoNowUtc);
         C.AddPair('response', Response);
         C.AddPair('done', TJSONBool.Create(Done));
+        if Done then
+        begin
+          C.AddPair('prompt_eval_count',
+            TJSONNumber.Create(Usage.PromptTokens));
+          C.AddPair('eval_count', TJSONNumber.Create(Usage.CompletionTokens));
+          AddTimings(C, Usage, True);
+        end;
         Result := C.ToJSON;
       finally
         C.Free;
@@ -782,6 +851,7 @@ begin
   Root.AddPair('done', TJSONBool.Create(True));
   Root.AddPair('prompt_eval_count', TJSONNumber.Create(Usage.PromptTokens));
   Root.AddPair('eval_count', TJSONNumber.Create(Usage.CompletionTokens));
+  AddTimings(Root, Usage, True);
   SendJson(AResponseInfo, Root);
 end;
 
