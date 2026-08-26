@@ -9,7 +9,7 @@ Prism is an LLM framework implemented entirely in **Delphi 13** — **without th
 | **Train** your own GPT-style transformer models (full backprop, AdamW) | ✅ |
 | **Load existing trained LLMs**: GGUF binary format (llama.cpp ecosystem) | ✅ |
 | Llama-architecture inference: RMSNorm, RoPE, GQA, SwiGLU | ✅ |
-| Quantized inference: Q8_0, Q4_0, Q4_1, F16, F32 (fused integer kernels) | ✅ |
+| Quantized inference: Q4_0, Q4_1, Q8_0, Q4_K, Q5_K, Q6_K, F16, F32 (fused kernels) | ✅ |
 | **Clustering / layer streaming**: the model does not have to fit entirely in RAM | ✅ |
 | **Mixture-of-Experts** ("thematic areas", top-1 routing) incl. training | ✅ |
 | **Self-verification** of answers (perplexity, self-consistency, critic) | ✅ |
@@ -18,10 +18,12 @@ Prism is an LLM framework implemented entirely in **Delphi 13** — **without th
 | Online fine-tuning via REST (`POST /api/train`) | ✅ |
 | **Law layer**: exact expression/formula evaluation, tool calling (`<<calc: ...>>`), law-grounded answer falsification | ✅ |
 | Domain-guided expert training (corpora → thematic areas, `x_areas` routing report) | ✅ |
-| GPU backend via OpenCL (dynamically loaded, no SDK required) | ⚠️ experimental |
+| **GPU backend via Vulkan** (dynamically loaded, no SDK required at runtime) | ✅ |
+| GPU kernels for **quantized** GGUF weights (Q4_0/Q4_1/Q8_0/Q4_K/Q5_K/Q6_K/F16/F32), weights resident in VRAM | ✅ |
+| GPU backend via OpenCL (F32 only, fallback where Vulkan is missing) | ⚠️ legacy |
 | Billion-parameter models | ✅ via GGUF + quantization + streaming (64-bit targets) |
 
-**Realistic expectation:** Prism models you train yourself are *small* models (millions of parameters) — useful for domain-specific assistants, autocomplete, classification, and for learning/experimenting. For "real" conversational quality, load a pre-trained GGUF model (e.g. TinyLlama 1.1B, Qwen2 1.5B, Mistral 7B) — thanks to quantized kernels and layer streaming this also runs on devices with little RAM, though CPU-bound and therefore slower than llama.cpp.
+**Realistic expectation:** Prism models you train yourself are *small* models (millions of parameters) — useful for domain-specific assistants, autocomplete, classification, and for learning/experimenting. For "real" conversational quality, load a pre-trained GGUF model (e.g. TinyLlama 1.1B, Qwen2 1.5B, Mistral 7B) — thanks to quantized kernels and layer streaming this also runs on devices with little RAM. With `--gpu` the quantized weights live in VRAM and the MatVecs run as Vulkan compute shaders, which is the difference between "technically works" and "usable" — see [GPU](#gpu) for measured numbers.
 
 ---
 
@@ -43,11 +45,19 @@ E:\delphi\projects\prism\
 │   ├── Prism.Train.pas         Trainer (AdamW, MoE backprop), online training
 │   ├── Prism.Verify.pas        Self-verification
 │   ├── Prism.Multimodal.pas    Multimodal corpus pipeline
-│   ├── Prism.Gpu.pas           OpenCL backend (dynamically loaded)
+│   ├── Prism.Vulkan.Api.pas    Vulkan 1.0 bindings (runtime-loaded, no SDK)
+│   ├── Prism.Vulkan.pas        Vulkan compute backend, VRAM residency, self-test
+│   ├── Prism.Vulkan.Shaders.inc  GENERATED: SPIR-V for the 8 quant kernels
+│   ├── Prism.Gpu.pas           Backend selection (Vulkan, then OpenCL, then CPU)
 │   └── Prism.RestServer.pas    REST API (Indy), OpenAI + Ollama compatible
+├── shaders\
+│   └── matvec.comp             ONE GLSL compute shader, compiled per quant type
+├── tools\
+│   └── BuildShaders.ps1        glslc → SPIR-V → Prism.Vulkan.Shaders.inc
 ├── app\
 │   ├── PrismTrain.dpr          Training CLI (console)
 │   ├── PrismServer.dpr         Server CLI (console)
+│   ├── PrismBench.dpr          GPU kernel self-test + CPU/GPU benchmark
 │   └── mobile\
 │       ├── PrismMobile.dpr     FMX app (Android/iOS/desktop)
 │       ├── MainFormU.pas/.fmx
@@ -63,11 +73,21 @@ All `.dpr` files reference their units via relative paths — just open them in 
 2. **Use the Release configuration!** The optimization difference is enormous for the compute kernels.
 3. Mobile: open `app\mobile\PrismMobile.dpr`, add *Android 64-bit* or *iOS* as target platform, deploy the model files to the documents directory under *Project → Deployment*. Android requires the **INTERNET** permission.
 
+The `.exe` is written next to the `.dpr`, i.e. `app\PrismServer.exe`. If a
+change does not seem to take effect, check that timestamp first - a stale binary
+there is easy to miss, and `--gpu` on a pre-Vulkan build even reports
+`GPU backend active: OpenCL` while a quantized model runs entirely on the CPU.
+
 Command line (example):
 
 ```bat
 "C:\Program Files (x86)\Embarcadero\Studio\37.0\bin\dcc64.exe" -B -$O+ -U..\src app\PrismServer.dpr
 ```
+
+> **The GPU shaders need no extra build step.** The SPIR-V for the compute
+> kernels is checked in as `src\Prism.Vulkan.Shaders.inc`, so a normal build
+> needs nothing but Delphi. Only editing `shaders\matvec.comp` requires the
+> Vulkan SDK — see [GPU](#gpu).
 
 > **Important for large models:** Always build 64-bit targets. All offsets/sizes in the code are `Int64` — files > 4 GB and billions of parameters are addressable, but only 64-bit processes can map them.
 
@@ -81,13 +101,20 @@ Get a pre-trained model in GGUF format (e.g. from Hugging Face: `tinyllama-1.1b-
 PrismServer --model models\tinyllama-1.1b-chat.Q8_0.gguf --ctx 1024
 ```
 
+Add `--gpu` if you have one — on a 3B model that is the difference
+between roughly 1 and roughly 9 tokens/s, see [GPU](#gpu):
+
+```bat
+PrismServer --model models\qwen2.5-3b-instruct-q4_k_m.gguf --gpu
+```
+
 With limited RAM (e.g. on mobile), enable layer streaming — only N transformer layers are then kept in memory at a time:
 
 ```bat
 PrismServer --model models\mistral-7b.Q4_0.gguf --ctx 512 --stream-layers 6
 ```
 
-Supported: GGUF v2/v3, tensor types **F32, F16, Q4_0, Q4_1, Q8_0** (please convert others with `llama-quantize`), architectures of the Llama family (llama, mistral, qwen2, …), tokenizers `llama` (SentencePiece) and `gpt2` (byte BPE).
+Supported: GGUF v2/v3, tensor types **F32, F16, Q4_0, Q4_1, Q8_0, Q4_K, Q5_K, Q6_K** — which covers the usual `Q4_K_M` / `Q5_K_M` downloads; convert anything else (Q2_K, Q3_K, IQ*, …) with `llama-quantize`. Architectures of the Llama family (llama, mistral, qwen2, …), tokenizers `llama` (SentencePiece) and `gpt2` (byte BPE).
 
 ## Quick start B: Train your own model
 
@@ -155,6 +182,8 @@ With `"verify": true`, the response additionally contains:
   "verdict": "pass"
 }
 ```
+
+**CAUTION:** verification might take 4-5 times more time.
 
 `stream: true` delivers server-sent events (`data: {...}`, terminated with `data: [DONE]`).
 
@@ -243,16 +272,187 @@ The Prism tokenizer works on **bytes** — so any kind of data can be tokenized.
 
 ### GPU
 
-`--gpu` attempts to dynamically load the system OpenCL (Windows `OpenCL.dll`, Linux/Android `libOpenCL.so`, macOS framework) — no third-party library, no SDK installation. Currently accelerates the large F32 MatVecs of your own models; weight buffers are cached on the GPU. Quantized GGUF kernels still run on the CPU. iOS has no OpenCL → automatic CPU fallback (Metal backend: roadmap).
+`--gpu` brings up a **Vulkan compute backend**. The Vulkan loader
+(`vulkan-1.dll` / `libvulkan.so.1` / MoltenVK) is opened at runtime and every
+entry point is resolved dynamically — no third-party library, no SDK on the
+user's machine, and if Vulkan is absent Prism simply keeps running on the CPU.
+
+What actually runs on the GPU:
+
+- **Quantized MatVec for all supported GGUF types** — Q4_0, Q4_1, Q8_0, Q4_K,
+  Q5_K, Q6_K, F16, F32. The weights are uploaded to VRAM *in their quantized
+  form* and dequantized inside the shader. Dequantizing on the host would throw
+  away the factor-4 bandwidth advantage that made quantization worth having.
+- **Weights stay resident.** Each tensor is uploaded once, on first use, and
+  reused for every later token.
+- **VRAM fills first-come.** Because the engine walks layers in order, this
+  gives llama.cpp's `n_gpu_layers` behaviour for free: whatever fits runs on the
+  GPU, the rest falls back to the CPU per tensor. `--gpu-budget MB` caps it; the
+  default is derived from the device's VRAM.
+
+  Partial residency is a safety net, not a performance mode. Measured on the
+  same 1.83 GB model with `--gpu-budget 300` (60 of 253 tensors resident, 16% of
+  the weights): **1.12 tok/s — slightly *worse* than the 1.26 tok/s of pure
+  CPU.** The 84% still on the CPU dominates, and the GPU share does not overlap
+  with it because the two run in sequence. It keeps a too-large model working
+  instead of failing; it does not make it fast. Size the budget so that most of
+  the model fits, or leave it at the default.
+
+Options:
+
+```
+--gpu                 enable the GPU backend
+--gpu-budget 2048     cap VRAM used for weights, in MB (0 = derive from device)
+--gpu-device 1        pick a GPU by index or name substring
+                      (equivalently: set PRISM_VK_DEVICE)
+```
+
+Device selection prefers discrete over integrated, VRAM breaks ties, and an
+explicit `--gpu-device` always wins.
+
+**Measured** — Qwen2.5-3B-Instruct Q4_K_M (1.83 GB of weights, fully resident),
+same prompt and 140 generated tokens, RTX 3060 Ti vs. a 16-thread CPU. The GPU
+row is a range over repeated runs at `--ctx 512` and at the model's default
+32768 context; the spread is run-to-run variance, not a context effect:
+
+| | tok/s | per generated token |
+|---|---|---|
+| CPU only | 1.26 | 791 ms |
+| `--gpu` (fully resident) | 8.7 – 9.3 | 108 – 115 ms |
+| `--gpu --gpu-budget 300` (16% resident) | 1.12 | 893 ms |
+
+**About 7x end to end.** Isolated MatVec throughput (`PrismBench`, 4096x4096) is
+higher — 13x for Q4_K, 27x for Q5_K, 14x for Q6_K — because a benchmark loop
+re-reads one hot tensor while real inference streams 253 different tensors per
+token.
+
+**Where the latency of a short request goes.** Throughput is not the whole
+story: a one-line answer still takes noticeable time, and it pays to know which
+part of it. All three rows below are measured end to end over the HTTP API, best
+of two warm runs, same model and GPU, at the model's default 32768 context:
+
+| request | prompt / generated | wall clock |
+|---|---|---|
+| short prompt, 1 token out | 16 / 1 | 1.17 s |
+| short prompt, 8 tokens out | 16 / 8 | 1.87 s |
+| long prompt, 1 token out | 196 / 1 | 13.78 s |
+
+Rows 1 and 3 differ only in prompt length, rows 1 and 2 only in generated
+length, so the two costs separate cleanly:
+
+- **~70 ms per prompt token**
+- **~100 ms per generated token**
+- fixed per-request cost: effectively zero (it was ~0.3 s until the shared
+  generator below)
+
+Cross-check: 16 prompt + 140 generated predicts 15.1 s, measured 15.4 s.
+
+A generated token costs more than a prompt token because prefill skips the
+vocabulary projection (`Prefill without logits` above) while generation pays it,
+plus the sampling pass — a softmax and top-k/top-p scan over 151936 logits, on
+the CPU.
+
+The consequence for short answers: **the prompt dominates.** In the 8-token row
+the 16 prompt tokens are 1.1 s of the 1.87 s, about 60% of the wait, and Prism
+feeds them through the model one at a time. **Batch prefill** — a matmul over
+the whole prompt instead of a token loop — would collapse those 16 passes into
+roughly one and bring that request to about 0.8 s. It needs real MatMul kernels
+(several columns at once) rather than the current MatVec shaders, so it is a
+separate piece of work; it is the single biggest remaining win for short
+requests and is on the roadmap.
+
+Two things that used to make this worse and no longer do:
+
+- The server built a **new generator per HTTP request**, and a generator builds
+  an engine, and an engine allocates the whole KV cache — `2 x NLayers x CtxLen
+  x KvDim` floats, which for a 3B model at the default 32768 context is 2.4 GB
+  per request. It is now created once and reused (`SharedGenerator`); safe
+  because generations are serialised by `FGenLock` anyway. Worth ~0.3 s per
+  request. `TVerifier` had the same problem and the same fix.
+- `--ctx N` still helps marginally (a smaller KV cache is cheaper to touch) but
+  is no longer worth hundreds of milliseconds per request.
+
+**`verify: true` is expensive by design.** It is not one extra pass over the
+answer — it runs a perplexity rescoring, **two additional full generations** for
+the self-consistency score, and a critic scoring pass. Measured on the 8-token
+answer above: 1.87 s without, **13.4 s with**. That is the intended cost of the
+feature, not a bug; leave it off unless you want the verdict.
+
+Be clear about where the remaining gap to llama.cpp is. Of the ~100 ms per
+generated token, roughly 40 ms is unavoidable weight reading and ~15 ms is
+driver latency from the **one submit + one fence per MatVec** (253 of them per
+token). The rest is everything still running on the CPU, each step with a host
+round trip: RMSNorm, RoPE, attention/softmax, SwiGLU, and the sampling scan over
+151936 logits. All of it is addressable and none of it needs new kernels:
+
+1. Record a whole token as **one command buffer** instead of 253, and keep the
+   KV cache in VRAM. Removes the fence latency and most host round trips.
+2. Move the elementwise and attention steps into shaders so the activations
+   never leave the GPU between MatVecs.
+3. Sample on the GPU, so a 151936-element logit vector does not have to come
+   back to the host every token.
+
+**Correctness.** The GGUF bit layouts in `shaders/matvec.comp` were transcribed
+by hand from `Prism.Vector.pas`, which is exactly the kind of code that can be
+wrong in a way that merely looks plausible. So `VulkanInit` runs a **self-test**
+before activating: synthetic tensors of all eight types are evaluated on the GPU
+and compared against `TQTensor.DequantRow` plus a double-precision dot product.
+If any layout disagrees, the backend refuses to activate and Prism stays on the
+CPU. Current agreement is 3e-9 to 3e-8 relative. The comparison deliberately
+does *not* use `TQTensor.MatVecCpu`: that kernel quantizes the activation to
+int8 for integer MACs, so it carries ~2e-4 of its own error, and the GPU path —
+which multiplies in float — is in fact the more accurate of the two.
+
+Run it yourself:
+
+```
+PrismBench                  self-test + benchmark on the best GPU
+PrismBench --verify-only    self-test only
+PrismBench --device 1       pick a GPU
+```
+
+**Editing the shaders.** `shaders/matvec.comp` is one source compiled eight
+times (`-DQTYPE=<ggml type id>`); `tools/BuildShaders.ps1` runs `glslc` and
+writes the SPIR-V into `src/Prism.Vulkan.Shaders.inc` as Delphi const arrays.
+That `.inc` is **committed on purpose** — building Prism needs nothing but
+Delphi. Only someone changing a kernel needs the Vulkan SDK, and only then:
+
+```
+powershell -ExecutionPolicy Bypass -File tools\BuildShaders.ps1
+```
+
+One warning if you do touch it: the kernel is bound by its memory *access
+pattern*. The lane decomposition is arranged so that adjacent lanes read
+adjacent dwords; the obvious "lane t handles block t" version puts them
+32/144/210 bytes apart and cost a measured 3-4x. The comment at the top of the
+shader explains the layout before you change it.
+
+**Online training vs. GPU.** `Prism.Train` updates the weights *in place*, and
+`TFullWeights.Params` is a dynamic array shared by reference with the inference
+path — the exact buffer whose contents the backend has cached in VRAM. The
+optimizer step therefore ends with `Backend.InvalidateWeights(Pointer(FParams))`
+so the next inference re-uploads. Without it, `--train --gpu` would keep serving
+the pre-update weights from VRAM and produce silently stale output. (The same
+was true of the older OpenCL weight cache; the fix covers both.)
+
+**Streaming vs. GPU.** `--stream-layers N` and `--gpu` pull against each other:
+an evicted layer must release its VRAM copy too, so a small `N` means
+re-uploading over PCIe on every visit. If the model fits in VRAM, leave
+`--stream-layers` at 0.
+
+**OpenCL** remains as a fallback for machines with an OpenCL driver but no
+Vulkan one. It only accelerates the F32 path of your own models; quantized GGUF
+models stay on the CPU there, and the server logs a note saying so.
 
 ---
 
 ## Limits & roadmap
 
 - **Don't expect miracles:** Training on a CPU will not reach GPT quality. The strength is the complete, understandable, compile-anywhere stack plus running pre-trained GGUF models.
-- Roadmap: Q4_K/Q5_K/Q6_K quantization, OpenCL kernels for quant MatVec, Metal backend (iOS/macOS), batch prefill (matmul instead of token loop), learned multimodal encoders, MoE load-balancing loss, GGUF export of your own models, speculative decoding.
+- Roadmap, GPU: one command buffer per token instead of one per MatVec; KV cache in VRAM; elementwise/attention steps as shaders so activations stop round-tripping to the host; F16 accumulation and subgroup reductions where the device supports them.
+- Roadmap, other: **batch prefill** (a matmul over the whole prompt instead of a token loop) - the biggest single win left for short requests, where the prompt accounts for roughly 60% of the wait; learned multimodal encoders, MoE load-balancing loss, GGUF export of your own models, speculative decoding.
 - The GPT-2 BPE pretokenizer is simplified (no full regex) — tokenization can deviate minimally from the original in edge cases.
-- The server serializes generations (one request computes exclusively); parallel sessions would share the CPU anyway.
+- The server serializes generations (one request computes exclusively); parallel sessions would share the CPU — or the single GPU queue — anyway.
 
 ## License / origin
 

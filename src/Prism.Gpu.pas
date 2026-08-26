@@ -1,15 +1,23 @@
 unit Prism.Gpu;
 
-{ Experimental GPU backend via OpenCL - WITHOUT third-party libraries:
-  the system's/driver's OpenCL library is loaded dynamically at runtime
-  (Windows: OpenCL.dll, Linux/Android: libOpenCL.so,
-  macOS: OpenCL.framework). If no OpenCL is available (e.g. iOS),
-  the CPU backend runs transparently.
+{ Compute backend selection - WITHOUT third-party libraries. Two stacks are
+  tried in order, both loaded dynamically at runtime; if neither is present
+  the CPU backend runs transparently and nothing else in Prism notices.
 
-  Accelerated are the large F32 MatVec operations (Prism's own models).
-  Weight rows are uploaded once into GPU buffers and cached; the
-  streaming layer reports evictions via InvalidateWeights.
-  Quantized GGUF kernels currently run on the CPU (roadmap). }
+  1. VULKAN (Prism.Vulkan) - the real one. Quantized GGUF kernels
+     (Q4_0/Q4_1/Q8_0/Q4_K/Q5_K/Q6_K/F16/F32) run on the GPU with the weights
+     resident in VRAM, which is what makes pre-trained models usable. Covers
+     Windows, Linux, Android natively and macOS/iOS through MoltenVK.
+
+  2. OPENCL - legacy fallback, F32 MatVec only (Prism's own models). Kept for
+     machines with an OpenCL driver but no Vulkan one. It re-uploads through a
+     256 MB cache and does one blocking round trip per MatVec, so it is not
+     fast; it is better than nothing.
+
+  Quantized dispatch does not go through TComputeBackend. It reaches the GPU
+  via Prism.Vector's QMatVecHook, which this unit installs, because
+  TQTensor.MatVec is called from Prism.Llama deep inside the layer loop and
+  must be able to decline per tensor. }
 
 {$POINTERMATH ON}
 
@@ -17,7 +25,7 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.SyncObjs,
-  System.Generics.Collections, Prism.Vector;
+  System.Generics.Collections, Prism.Vector, Prism.Vulkan;
 
 type
   TComputeBackend = class
@@ -29,8 +37,19 @@ type
   end;
 
 function Backend: TComputeBackend;
-function TryInitGpuBackend(out Info: string): Boolean;
+
+{ Brings up the best available GPU stack. BudgetMB <= 0 lets the backend size
+  its VRAM budget from the device. Returns False with a readable reason in
+  Info when no GPU could be used - a normal outcome, not an error. }
+function TryInitGpuBackend(out Info: string; BudgetMB: Integer = 0;
+  const Log: TProc<string> = nil): Boolean;
 procedure ShutdownGpuBackend;
+
+{ One line for logs and the /api/status payload. }
+function GpuDetails: string;
+
+{ True when quantized GGUF MatVec is actually running on the GPU. }
+function GpuQuantizedActive: Boolean;
 
 implementation
 
@@ -46,6 +65,20 @@ type
 
   TCpuBackend = class(TComputeBackend);
 
+  { Routes Prism.Inference's F32 MatVec to Vulkan. The quantized GGUF path
+    does not come through here - see QMatVecHook in the unit header. }
+  TVulkanBackend = class(TComputeBackend)
+  public
+    function Name: string; override;
+    procedure MatVecF32W(Y, W, X: PSingle; Rows, Cols: Integer;
+      Bias: PSingle; WKey: Pointer; WKeyOff: Int64); override;
+    procedure InvalidateWeights(WKey: Pointer); override;
+  end;
+
+const
+  { Below this much work a GPU round trip costs more than it saves. }
+  GPU_MIN_WORK = 256 * 1024;
+
 function TComputeBackend.Name: string;
 begin
   Result := 'CPU (' + IntToStr(TThread.ProcessorCount) + ' threads)';
@@ -59,6 +92,30 @@ end;
 
 procedure TComputeBackend.InvalidateWeights(WKey: Pointer);
 begin
+end;
+
+{ TVulkanBackend }
+
+function TVulkanBackend.Name: string;
+var
+  St: TVulkanStats;
+begin
+  St := VulkanStats;
+  Result := 'GPU/Vulkan: ' + St.DeviceName;
+end;
+
+procedure TVulkanBackend.MatVecF32W(Y, W, X: PSingle; Rows, Cols: Integer;
+  Bias: PSingle; WKey: Pointer; WKeyOff: Int64);
+begin
+  { Small matrices are not worth a submit + fence round trip. }
+  if (Int64(Rows) * Cols < GPU_MIN_WORK) or
+     (not VulkanMatVecF32(Y, W, X, Rows, Cols, Bias, WKey)) then
+    inherited;
+end;
+
+procedure TVulkanBackend.InvalidateWeights(WKey: Pointer);
+begin
+  VulkanEvictOwner(WKey);
 end;
 
 { ---------- OpenCL (dynamically loaded) ---------- }
@@ -173,7 +230,6 @@ type
 
 const
   MAX_GPU_CACHE_BYTES: Int64 = 256 * 1024 * 1024;
-  GPU_MIN_WORK = 256 * 1024; // below this the transfer overhead dominates
 
 var
   GBackend: TComputeBackend = nil;
@@ -494,29 +550,70 @@ begin
     Result := GCpuBackend;
 end;
 
-function TryInitGpuBackend(out Info: string): Boolean;
+function TryInitGpuBackend(out Info: string; BudgetMB: Integer = 0;
+  const Log: TProc<string> = nil): Boolean;
 var
   B: TOpenCLBackend;
+  VkInfo, ClInfo: string;
 begin
-  Result := False;
   if GBackend <> nil then
   begin
     Info := GBackend.Name;
     Exit(True);
   end;
+
+  { Vulkan first: it is the only stack with quantized kernels, and those are
+    what decide whether a real GGUF model is usable. }
+  if VulkanInit(BudgetMB, Log, VkInfo) then
+  begin
+    GBackend := TVulkanBackend.Create;
+    { From here on TQTensor.MatVec offers every quantized tensor to the GPU. }
+    QMatVecHook := VulkanMatVec;
+    Info := 'Vulkan - ' + VkInfo;
+    Exit(True);
+  end;
+
+  { No Vulkan. Fall back to OpenCL, which only accelerates the F32 path. }
   B := TOpenCLBackend.Create;
-  if B.Init(Info) then
+  if B.Init(ClInfo) then
   begin
     GBackend := B;
-    Result := True;
+    Info := 'OpenCL (F32 only, quantized models stay on the CPU) - ' + ClInfo;
+    Exit(True);
+  end;
+  B.Free;
+
+  Info := 'Vulkan: ' + VkInfo + '; OpenCL: ' + ClInfo;
+  Result := False;
+end;
+
+function GpuDetails: string;
+var
+  St: TVulkanStats;
+begin
+  if VulkanReady then
+  begin
+    St := VulkanStats;
+    Result := St.Describe;
   end
+  else if GBackend <> nil then
+    Result := GBackend.Name
   else
-    B.Free;
+    Result := 'CPU only (' + IntToStr(TThread.ProcessorCount) + ' threads)';
+end;
+
+function GpuQuantizedActive: Boolean;
+begin
+  Result := VulkanReady and Assigned(QMatVecHook);
 end;
 
 procedure ShutdownGpuBackend;
 begin
+  { Unhook before tearing down, so a MatVec racing the shutdown lands on the
+    CPU rather than in a freed backend. }
+  QMatVecHook := nil;
   FreeAndNil(GBackend);
+  VulkanShutdown;
 end;
 
 initialization

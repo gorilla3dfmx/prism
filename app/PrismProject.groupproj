@@ -1,12 +1,15 @@
 ﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
-        <ProjectGuid>{1025EA5C-DFC2-4C11-8407-64D37B92DC89}</ProjectGuid>
+        <ProjectGuid>{C9316913-280F-4555-9C46-CC23519B38CE}</ProjectGuid>
     </PropertyGroup>
     <ItemGroup>
         <Projects Include="PrismServer.dproj">
             <Dependencies/>
         </Projects>
         <Projects Include="PrismTrain.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="PrismBench.dproj">
             <Dependencies/>
         </Projects>
     </ItemGroup>
@@ -35,14 +38,23 @@
     <Target Name="PrismTrain:Make">
         <MSBuild Projects="PrismTrain.dproj" Targets="Make"/>
     </Target>
+    <Target Name="PrismBench">
+        <MSBuild Projects="PrismBench.dproj"/>
+    </Target>
+    <Target Name="PrismBench:Clean">
+        <MSBuild Projects="PrismBench.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="PrismBench:Make">
+        <MSBuild Projects="PrismBench.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="PrismServer;PrismTrain"/>
+        <CallTarget Targets="PrismServer;PrismTrain;PrismBench"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="PrismServer:Clean;PrismTrain:Clean"/>
+        <CallTarget Targets="PrismServer:Clean;PrismTrain:Clean;PrismBench:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="PrismServer:Make;PrismTrain:Make"/>
+        <CallTarget Targets="PrismServer:Make;PrismTrain:Make;PrismBench:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

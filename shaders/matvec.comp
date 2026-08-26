@@ -1,0 +1,355 @@
+#version 450
+
+/* Prism -- fused quantized MatVec compute shader (y = W * x).
+ *
+ * ONE source, compiled eight times with -DQTYPE=<ggml type id>.
+ * The bit layouts mirror Prism.Vector.pas 1:1 (which in turn follows
+ * llama.cpp/ggml-quants.c, QK_K = 256 format). If you touch a layout here,
+ * touch it there too -- Prism.Vulkan.pas checks the two against each other on
+ * startup and refuses to activate the GPU if they disagree.
+ *
+ * ---------------------------------------------------------------------------
+ * THE THING TO UNDERSTAND BEFORE EDITING: LANE-ADJACENT ADDRESSES
+ * ---------------------------------------------------------------------------
+ * This kernel is bound by its memory ACCESS PATTERN, not by ALU and not (yet)
+ * by bandwidth. What matters is that at any one instruction the 32 lanes of a
+ * warp read ADJACENT dwords, so the hardware coalesces them into one or two
+ * transactions.
+ *
+ * The obvious decomposition -- "lane t handles the t-th 32-value block" -- is
+ * exactly wrong: consecutive lanes then land 32/144/210 bytes apart, and a
+ * single load instruction fans out into five or more transactions. Measured
+ * cost of getting this wrong on an RTX 3060 Ti: about 22 GB/s.
+ *
+ * So every type below is decomposed the other way round. The workgroup
+ * cooperates on ONE super-block (or one group of legacy blocks) at a time, and
+ * the lane id is split into
+ *   - a HIGH part, picking which sub-block / quarter / block the lane serves
+ *   - a LOW part, picking which dword INSIDE that group, so that consecutive
+ *     lanes walk consecutive dwords
+ * Each lane turns its one dword into 4 values and accumulates privately; the
+ * cross-lane reduction happens ONCE per row instead of once per block.
+ *
+ * ---------------------------------------------------------------------------
+ * Other deliberate choices
+ * ---------------------------------------------------------------------------
+ *  - No GL_EXT_shader_8bit_storage / 16bit_storage. Weight bytes come out of a
+ *    plain std430 uint array by hand (gu32 below). The quant block strides
+ *    (18/20/34/210 bytes) are not 4-byte aligned, so typed byte access would
+ *    need an extension that mobile drivers (Mali/Adreno) still lack.
+ *  - No int8 dot-product intrinsics, and THE ACTIVATION IS NOT QUANTIZED.
+ *    The CPU kernels in Prism.Vector quantize x to int8 to get integer MACs;
+ *    on a GPU float FMA is free, so we multiply in float. That makes the GPU
+ *    result more accurate than the CPU one -- which is why the self-test
+ *    compares both against DequantRow rather than against each other.
+ *  - LOCAL_SIZE is fixed at 64: the K-quant decompositions rely on 64 lanes
+ *    covering exactly one 256-value super-block, four values per lane.
+ */
+
+#ifndef QTYPE
+#define QTYPE 0
+#endif
+
+#define T_F32   0
+#define T_F16   1
+#define T_Q4_0  2
+#define T_Q4_1  3
+#define T_Q8_0  8
+#define T_Q4_K 12
+#define T_Q5_K 13
+#define T_Q6_K 14
+
+#define LOCAL_SIZE 64
+
+layout(local_size_x = LOCAL_SIZE) in;
+
+/* set 0 = the weight tensor (one descriptor set per resident tensor, written
+ * once at upload time). set 1 = the shared activation/result pair, written
+ * once at init and again only if those buffers ever have to grow. Splitting
+ * them keeps a buffer resize from touching every tensor's descriptor. */
+layout(set = 0, binding = 0, std430) readonly  buffer WBuf { uint  wd[]; };
+layout(set = 1, binding = 0, std430) readonly  buffer XBuf { float xv[]; };
+layout(set = 1, binding = 1, std430) writeonly buffer YBuf { float yv[]; };
+
+layout(push_constant) uniform PC {
+    uint rows;      // rows of this tensor
+    uint cols;      // columns (= length of x)
+    uint rowBytes;  // stride between rows in the weight buffer
+    uint rowBase;   // first row this dispatch is responsible for
+    uint xOff;      // element offset of x inside XBuf
+    uint yOff;      // element offset of y inside YBuf
+} pc;
+
+shared float sred[LOCAL_SIZE];
+
+/* ---- access into the weight buffer ----
+ *
+ * gb() burns a whole dword fetch to deliver one byte, so it serves only the
+ * scalar header fields (f16 scales, 6-bit scale nibbles, int8 scales).
+ * Everything on the hot path goes through gu32(): one fetch per four bytes.
+ *
+ * Quant strides of 18/20/34/210 bytes put groups on 2-byte boundaries, so
+ * gu32 stitches the value out of two dwords when it has to. Tensor buffers
+ * carry BUF_SLACK bytes of padding (see Prism.Vulkan.pas) precisely so the
+ * wd[i + 1] below can never run past the end of the buffer.
+ */
+
+uint gb(uint off) {
+    return (wd[off >> 2u] >> ((off & 3u) << 3u)) & 0xFFu;
+}
+
+uint gu32(uint off) {
+    uint i  = off >> 2u;
+    uint sh = (off & 3u) << 3u;
+    uint lo = wd[i];
+    if (sh == 0u)
+        return lo;                       // shifting by 32 is undefined in GLSL
+    return (lo >> sh) | (wd[i + 1u] << (32u - sh));
+}
+
+uint gu16(uint off) {
+    return gb(off) | (gb(off + 1u) << 8u);
+}
+
+float gf16(uint off) {
+    return unpackHalf2x16(gu16(off)).x;
+}
+
+int gi8(uint off) {
+    return int(gb(off) << 24u) >> 24;    // sign-extend
+}
+
+/* sign-extended byte n (0..3) of a packed dword */
+float sbyte(uint w, uint n) {
+    return float(int(w << (24u - (n << 3u))) >> 24);
+}
+
+/* unsigned byte n (0..3) of a packed dword */
+uint ubyte(uint w, uint n) {
+    return (w >> (n << 3u)) & 0xFFu;
+}
+
+#if QTYPE == T_Q4_K || QTYPE == T_Q5_K
+/* 6-bit sub-block scale/min pairs packed into 12 bytes -- GetScaleMinK4, but
+   fed from three PRELOADED dwords rather than doing up to six single-byte
+   fetches of its own.
+   The 12 scale bytes S[0..11] sit at base+4, so with base dword-aligned
+   (144 and 176 are both multiples of 4) they are exactly three dwords:
+       A = S[0..3]    B = S[4..7]    C = S[8..11]
+   Sub-block s reads byte (s & 3) of two or three of them. Before this the
+   header fetches outnumbered the actual data fetch 8:1 per lane. */
+void scaleMin(uint s, uint A, uint B, uint C, out float sc, out float mn) {
+    uint u = s & 3u;
+    uint d, m;
+    if (s < 4u) {
+        d = ubyte(A, u) & 63u;
+        m = ubyte(B, u) & 63u;
+    } else {
+        d = (ubyte(C, u) & 15u) | ((ubyte(A, u) >> 6u) << 4u);
+        m = (ubyte(C, u) >> 4u) | ((ubyte(B, u) >> 6u) << 4u);
+    }
+    sc = float(d);
+    mn = float(m);
+}
+#endif
+
+/* ---- this lane's partial sum over one whole row ----
+ * rb  = byte offset of the row inside the weight buffer
+ * tid = lane id within the workgroup
+ */
+float rowPartial(uint rb, uint tid) {
+    float acc = 0.0;
+    uint xo;
+
+#if QTYPE == T_F32
+    /* rowBytes = cols*4, so the row base is dword-aligned. Lane t takes
+       dwords t, t+64, ... -- adjacent lanes, adjacent dwords. */
+    uint o = rb >> 2u;
+    for (uint i = tid; i < pc.cols; i += uint(LOCAL_SIZE))
+        acc += uintBitsToFloat(wd[o + i]) * xv[pc.xOff + i];
+
+#elif QTYPE == T_F16
+    /* one dword = two halves; lane t takes dword t, t+64, ... */
+    uint o  = rb >> 2u;
+    uint nd = pc.cols >> 1u;
+    for (uint i = tid; i < nd; i += uint(LOCAL_SIZE)) {
+        vec2 h = unpackHalf2x16(wd[o + i]);
+        xo = pc.xOff + i * 2u;
+        acc += h.x * xv[xo] + h.y * xv[xo + 1u];
+    }
+
+#elif QTYPE == T_Q8_0
+    /* block = 34 B (f16 d + 32 int8). 8 lanes per block -> 8 blocks per pass;
+       the low 3 bits of the lane id pick the dword inside the block. */
+    uint nblk = pc.cols >> 5u;
+    uint b    = tid >> 3u;
+    uint c    = tid & 7u;
+    for (uint b0 = 0u; b0 + b < nblk; b0 += 8u) {
+        uint bi = b0 + b;
+        uint bo = rb + bi * 34u;
+        float d = gf16(bo);
+        uint  w = gu32(bo + 2u + c * 4u);
+        xo = pc.xOff + bi * 32u + c * 4u;
+        acc += d * (sbyte(w, 0u) * xv[xo]
+                  + sbyte(w, 1u) * xv[xo + 1u]
+                  + sbyte(w, 2u) * xv[xo + 2u]
+                  + sbyte(w, 3u) * xv[xo + 3u]);
+    }
+
+#elif QTYPE == T_Q4_0
+    /* block = 18 B (f16 d + 16 nibble bytes). Low nibble of byte i is value i,
+       high nibble is value i+16. 4 lanes per block -> 16 blocks per pass. */
+    uint nblk = pc.cols >> 5u;
+    uint b    = tid >> 2u;
+    uint c    = tid & 3u;
+    for (uint b0 = 0u; b0 + b < nblk; b0 += 16u) {
+        uint bi = b0 + b;
+        uint bo = rb + bi * 18u;
+        float d = gf16(bo);
+        uint  w = gu32(bo + 2u + c * 4u);
+        xo = pc.xOff + bi * 32u + c * 4u;
+        float s = 0.0;
+        for (uint k = 0u; k < 4u; ++k) {
+            uint q = ubyte(w, k);
+            s += (float(q & 15u) - 8.0) * xv[xo + k]
+               + (float(q >> 4u) - 8.0) * xv[xo + k + 16u];
+        }
+        acc += d * s;
+    }
+
+#elif QTYPE == T_Q4_1
+    /* block = 20 B (f16 d + f16 m + 16 nibble bytes); value = q*d + m, so the
+       min contributes d*sum(q*x) + m*sum(x). */
+    uint nblk = pc.cols >> 5u;
+    uint b    = tid >> 2u;
+    uint c    = tid & 3u;
+    for (uint b0 = 0u; b0 + b < nblk; b0 += 16u) {
+        uint bi = b0 + b;
+        uint bo = rb + bi * 20u;
+        float d = gf16(bo);
+        float m = gf16(bo + 2u);
+        uint  w = gu32(bo + 4u + c * 4u);
+        xo = pc.xOff + bi * 32u + c * 4u;
+        float sq = 0.0, sx = 0.0;
+        for (uint k = 0u; k < 4u; ++k) {
+            uint q = ubyte(w, k);
+            float x0 = xv[xo + k];
+            float x1 = xv[xo + k + 16u];
+            sq += float(q & 15u) * x0 + float(q >> 4u) * x1;
+            sx += x0 + x1;
+        }
+        acc += d * sq + m * sx;
+    }
+
+#elif QTYPE == T_Q4_K
+    /* super-block = 144 B: f16 d, f16 dmin, 12 scale bytes, 128 quant bytes.
+       Sub-block s (0..7) owns 32 values; s>>1 picks the 32-byte nibble group,
+       s&1 picks low vs. high nibble. 64 lanes = exactly one super-block:
+         s = tid>>3  (which sub-block)     c = tid&7  (dword inside its group)
+       Lanes 0..7 read the group's 32 bytes in order and lanes 8..15 read the
+       same 32 bytes for the high nibbles, so a warp touches 64 contiguous
+       bytes per load. */
+    uint nsb = pc.cols >> 8u;
+    uint s   = tid >> 3u;
+    uint c   = tid & 7u;
+    uint shift = (s & 1u) << 2u;
+    for (uint sbi = 0u; sbi < nsb; ++sbi) {
+        uint hdr = (rb + sbi * 144u) >> 2u;   // base is dword-aligned
+        /* d and dmin are adjacent halves of one dword */
+        vec2 dd = unpackHalf2x16(wd[hdr]);
+        float sc, mn;
+        scaleMin(s, wd[hdr + 1u], wd[hdr + 2u], wd[hdr + 3u], sc, mn);
+        uint w = wd[hdr + 4u + (s >> 1u) * 8u + c];   // quant bytes at +16
+        xo = pc.xOff + sbi * 256u + s * 32u + c * 4u;
+        float sq = 0.0, sx = 0.0;
+        for (uint k = 0u; k < 4u; ++k) {
+            float xx = xv[xo + k];
+            sq += float((ubyte(w, k) >> shift) & 15u) * xx;
+            sx += xx;
+        }
+        acc += dd.x * sc * sq - dd.y * mn * sx;
+    }
+
+#elif QTYPE == T_Q5_K
+    /* super-block = 176 B: f16 d, f16 dmin, 12 scales, 32 high-bit bytes,
+       128 quant bytes. Same lane split as Q4_K; the 5th bit of sub-block s
+       sits in bit s of the qh byte for that value position. */
+    uint nsb = pc.cols >> 8u;
+    uint s   = tid >> 3u;
+    uint c   = tid & 7u;
+    uint shift = (s & 1u) << 2u;
+    for (uint sbi = 0u; sbi < nsb; ++sbi) {
+        uint hdr = (rb + sbi * 176u) >> 2u;   // base is dword-aligned
+        vec2 dd = unpackHalf2x16(wd[hdr]);    // d and dmin share one dword
+        float sc, mn;
+        scaleMin(s, wd[hdr + 1u], wd[hdr + 2u], wd[hdr + 3u], sc, mn);
+        uint wh = wd[hdr + 4u + c];                    // qh bytes at +16
+        uint wl = wd[hdr + 12u + (s >> 1u) * 8u + c];  // ql bytes at +48
+        xo = pc.xOff + sbi * 256u + s * 32u + c * 4u;
+        float sq = 0.0, sx = 0.0;
+        for (uint k = 0u; k < 4u; ++k) {
+            uint q = ((ubyte(wl, k) >> shift) & 15u)
+                   | (((ubyte(wh, k) >> s) & 1u) << 4u);
+            float xx = xv[xo + k];
+            sq += float(q) * xx;
+            sx += xx;
+        }
+        acc += dd.x * sc * sq - dd.y * mn * sx;
+    }
+
+#elif QTYPE == T_Q6_K
+    /* super-block = 210 B: 128 low nibbles, 64 high-bit-pairs, 16 int8
+       scales, f16 d. The layout is two halves of 128 values, each split into
+       four quarters of 32:
+         n = tid>>5      which 128-value half
+         j = (tid>>3)&3  which quarter -> low/high nibble and which qh bit pair
+         c = tid&7       dword inside the quarter
+       The scale changes every 16 values and a lane covers 4 consecutive
+       values, so the scale index is constant per lane: (c>>2) selects it. */
+    uint nsb = pc.cols >> 8u;
+    uint n   = tid >> 5u;
+    uint j   = (tid >> 3u) & 3u;
+    uint c   = tid & 7u;
+    uint sh4 = (j >= 2u) ? 4u : 0u;
+    uint shh = j << 1u;
+    for (uint sbi = 0u; sbi < nsb; ++sbi) {
+        uint base = rb + sbi * 210u;
+        float d   = gf16(base + 208u);
+        float sc  = float(gi8(base + 192u + 8u * n + 2u * j + (c >> 2u)));
+        uint wl = gu32(base + 64u * n + (j & 1u) * 32u + c * 4u);
+        uint wh = gu32(base + 128u + 32u * n + c * 4u);
+        xo = pc.xOff + sbi * 256u + 128u * n + 32u * j + c * 4u;
+        float s4 = 0.0;
+        for (uint k = 0u; k < 4u; ++k) {
+            uint q = ((ubyte(wl, k) >> sh4) & 15u)
+                   | (((ubyte(wh, k) >> shh) & 3u) << 4u);
+            s4 += (float(q) - 32.0) * xv[xo + k];
+        }
+        acc += d * sc * s4;
+    }
+#endif
+
+    return acc;
+}
+
+void main() {
+    uint row = pc.rowBase + gl_WorkGroupID.x;
+    uint tid = gl_LocalInvocationID.x;
+
+    float acc = 0.0;
+    if (row < pc.rows)
+        acc = rowPartial(row * pc.rowBytes, tid);
+
+    /* One reduction per row -- amortised over the whole row instead of being
+       repeated per block, which was the other half of why the previous
+       decomposition was slow. */
+    sred[tid] = acc;
+    barrier();
+    for (uint s = uint(LOCAL_SIZE) / 2u; s > 0u; s >>= 1u) {
+        if (tid < s)
+            sred[tid] += sred[tid + s];
+        barrier();
+    }
+    if (tid == 0u && row < pc.rows)
+        yv[pc.yOff + row] = sred[0];
+}

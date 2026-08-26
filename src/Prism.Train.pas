@@ -20,7 +20,7 @@ interface
 uses
   System.SysUtils, System.Classes, System.Math, System.SyncObjs,
   System.Generics.Collections, System.Threading,
-  Prism.Types, Prism.Vector, Prism.Tensor, Prism.Model, Prism.Tokenizer;
+  Prism.Gpu, Prism.Types, Prism.Vector, Prism.Tensor, Prism.Model, Prism.Tokenizer;
 
 type
   TActLayout = record
@@ -570,6 +570,16 @@ begin
           LR * (MHat / (Sqrt(VHat) + Eps) + WeightDecay * FParams[I]);
       end;
     end);
+
+  { The weights just changed IN PLACE, and FParams is the very same buffer the
+    inference path hands to the compute backend (TFullWeights.Params is a
+    dynamic array, so trainer and engine share it). A GPU backend caches
+    uploaded weights keyed by that buffer's address, so without this call it
+    would keep serving the pre-update copy from VRAM -- silently wrong output
+    after every online training step. Cheap: the first call after a step
+    evicts, the rest are no-ops because nothing is resident until the next
+    inference re-uploads. }
+  Backend.InvalidateWeights(Pointer(FParams));
 end;
 
 function TTrainer.TrainStep(const Tokens: TArray<Integer>; var Rng: TRng;

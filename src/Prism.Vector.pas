@@ -41,8 +41,13 @@ type
     function RowBytes: Int64;
     function TotalBytes: Int64;
     function IsEmpty: Boolean;
-    { y[0..Rows) = W * x[0..Cols) - fused kernel, parallelized }
+    { y[0..Rows) = W * x[0..Cols).
+      MatVec offers the tensor to QMatVecHook first (the GPU backend installs
+      itself there) and runs MatVecCpu when the hook declines or is absent.
+      MatVecCpu is the reference implementation: always CPU, never delegates.
+      Anything comparing the two paths must call MatVecCpu explicitly. }
     procedure MatVec(Y, X: PSingle);
+    procedure MatVecCpu(Y, X: PSingle);
     { Dequantize one row to F32 (e.g. embedding lookup) }
     procedure DequantRow(Row: Integer; Dst: PSingle);
   end;
@@ -67,6 +72,19 @@ function ArgMax(X: PSingle; N: Integer): Integer;
 { Parallelism threshold: below this, thread fan-out does not pay off }
 const
   PAR_MIN_WORK = 64 * 1024;
+
+type
+  { Installed by Prism.Gpu once a compute backend is up. Returning False means
+    "not handled" -- the caller then runs the CPU kernel, so a backend may
+    decline per tensor (unsupported type, VRAM exhausted, device lost)
+    without any of its callers knowing about it.
+
+    Prism.Vector must not depend on the GPU units (they depend on it), hence
+    a hook rather than a direct call. }
+  TQMatVecHook = function(const T: TQTensor; Y, X: PSingle): Boolean;
+
+var
+  QMatVecHook: TQMatVecHook = nil;
 
 implementation
 
@@ -641,6 +659,13 @@ begin
 end;
 
 procedure TQTensor.MatVec(Y, X: PSingle);
+begin
+  if Assigned(QMatVecHook) and QMatVecHook(Self, Y, X) then
+    Exit;
+  MatVecCpu(Y, X);
+end;
+
+procedure TQTensor.MatVecCpu(Y, X: PSingle);
 var
   NB, R: Integer;
   XQ: TArray<ShortInt>;

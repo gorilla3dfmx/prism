@@ -34,6 +34,10 @@ type
   TVerifier = class
   private
     FBackend: TLlmBackend;
+    { Same reasoning as the server's shared generator: building one allocates
+      a whole KV cache. Verify already runs inside the server's generation
+      lock, so one generator for the lifetime of the verifier is enough. }
+    FGen: TGenerator;
     function BigramSimilarity(const A, B: TArray<Integer>): Double;
   public
     PplWarn: Double;   // perplexity above this value -> warn
@@ -41,6 +45,7 @@ type
     MinConsistency: Double;
     MinCritic: Double;
     constructor Create(ABackend: TLlmBackend);
+    destructor Destroy; override;
     function Verify(const PromptTokens: TArray<Integer>;
       const UserText, AnswerText: string;
       Samples: Integer = 2): TVerificationResult;
@@ -99,10 +104,17 @@ constructor TVerifier.Create(ABackend: TLlmBackend);
 begin
   inherited Create;
   FBackend := ABackend;
+  FGen := nil;
   PplWarn := 12.0;
   PplFail := 60.0;
   MinConsistency := 0.34;
   MinCritic := 0.45;
+end;
+
+destructor TVerifier.Destroy;
+begin
+  FGen.Free;
+  inherited;
 end;
 
 function TVerifier.BigramSimilarity(const A, B: TArray<Integer>): Double;
@@ -159,51 +171,49 @@ begin
   Result.SelfConsistency := 0;
   Result.CriticScore := 0.5;
 
-  Gen := TGenerator.Create(FBackend);
-  try
-    { 1. Perplexity of the model's own answer }
-    if Length(AnswerTokens) > 0 then
-      Result.Perplexity := Gen.Perplexity(PromptTokens, AnswerTokens);
+  if FGen = nil then
+    FGen := TGenerator.Create(FBackend);
+  Gen := FGen;
+  { 1. Perplexity of the model's own answer }
+  if Length(AnswerTokens) > 0 then
+    Result.Perplexity := Gen.Perplexity(PromptTokens, AnswerTokens);
 
-    { 2. Self-consistency over alternative samples }
-    if Samples > 0 then
+  { 2. Self-consistency over alternative samples }
+  if Samples > 0 then
+  begin
+    SP := TSamplingParams.Default;
+    SP.Temperature := 0.9;
+    SP.MaxTokens := Min(128, Max(16, 2 * Length(AnswerTokens)));
+    SimSum := 0;
+    for S := 1 to Samples do
     begin
-      SP := TSamplingParams.Default;
-      SP.Temperature := 0.9;
-      SP.MaxTokens := Min(128, Max(16, 2 * Length(AnswerTokens)));
-      SimSum := 0;
-      for S := 1 to Samples do
-      begin
-        SP.Seed := UInt64(S) * 7919;
-        AltTokens := TList<Integer>.Create;
-        try
-          Gen.Generate(PromptTokens, SP, nil, Usage, AltTokens);
-          SimSum := SimSum + BigramSimilarity(AnswerTokens, AltTokens.ToArray);
-        finally
-          AltTokens.Free;
-        end;
+      SP.Seed := UInt64(S) * 7919;
+      AltTokens := TList<Integer>.Create;
+      try
+        Gen.Generate(PromptTokens, SP, nil, Usage, AltTokens);
+        SimSum := SimSum + BigramSimilarity(AnswerTokens, AltTokens.ToArray);
+      finally
+        AltTokens.Free;
       end;
-      Result.SelfConsistency := SimSum / Samples;
     end;
+    Result.SelfConsistency := SimSum / Samples;
+  end;
 
-    { 3. Critic pass: P("yes") vs. P("no") }
-    SetLength(Msgs, 1);
-    Msgs[0] := TChatMessage.Make('user',
-      'Check the following answer.'#10 +
-      'Question: ' + UserText + #10 +
-      'Answer: ' + AnswerText + #10 +
-      'Is the answer correct and consistent? Reply with yes or no only.');
-    CriticTokens := Tok.BuildChatTokens(Msgs, FBackend.DefaultTemplate);
-    YesTok := Tok.Encode('yes');
-    NoTok := Tok.Encode('no');
-    if (Length(YesTok) > 0) and (Length(NoTok) > 0) then
-    begin
-      LpYes := Gen.ScoreContinuation(CriticTokens, YesTok) / Length(YesTok);
-      LpNo := Gen.ScoreContinuation(CriticTokens, NoTok) / Length(NoTok);
-      Result.CriticScore := Exp(LpYes) / Max(1e-12, Exp(LpYes) + Exp(LpNo));
-    end;
-  finally
-    Gen.Free;
+  { 3. Critic pass: P("yes") vs. P("no") }
+  SetLength(Msgs, 1);
+  Msgs[0] := TChatMessage.Make('user',
+    'Check the following answer.'#10 +
+    'Question: ' + UserText + #10 +
+    'Answer: ' + AnswerText + #10 +
+    'Is the answer correct and consistent? Reply with yes or no only.');
+  CriticTokens := Tok.BuildChatTokens(Msgs, FBackend.DefaultTemplate);
+  YesTok := Tok.Encode('yes');
+  NoTok := Tok.Encode('no');
+  if (Length(YesTok) > 0) and (Length(NoTok) > 0) then
+  begin
+    LpYes := Gen.ScoreContinuation(CriticTokens, YesTok) / Length(YesTok);
+    LpNo := Gen.ScoreContinuation(CriticTokens, NoTok) / Length(NoTok);
+    Result.CriticScore := Exp(LpYes) / Max(1e-12, Exp(LpYes) + Exp(LpNo));
   end;
 
   { 4. Law-grounded check: re-compute arithmetic claims in the answer.

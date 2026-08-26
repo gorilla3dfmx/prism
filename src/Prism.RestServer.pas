@@ -42,6 +42,7 @@ type
     CorpusPath: string;
     Template: string;        // auto|prism|chatml|llama2|plain
     UseGpu: Boolean;
+    GpuBudgetMB: Integer;
     class function Default: TServerOptions; static;
   end;
 
@@ -52,9 +53,17 @@ type
     FBackend: TLlmBackend;
     FVerifier: TVerifier;
     FGenLock: TCriticalSection;
+    { One generator for the whole server, not one per request. Creating one
+      builds a fresh engine, and an engine allocates the full KV cache --
+      2 x NLayers x CtxLen x KvDim floats, which is 2.4 GB for a 3B model at
+      the default 32768 context. Doing that per HTTP request cost ~0.3 s of
+      allocation alone. Safe to share because every generation runs inside
+      FGenLock; see SharedGenerator. }
+    FGen: TGenerator;
     FTrainSvc: TTrainingService;
     FLog: TProc<string>;
     FTemplate: TChatTemplate;
+    function SharedGenerator: TGenerator;
     procedure Log(const S: string);
     procedure DoCommand(AContext: TIdContext;
       ARequestInfo: TIdHTTPRequestInfo; AResponseInfo: TIdHTTPResponseInfo);
@@ -184,6 +193,7 @@ begin
   Result.CorpusPath := 'corpus.bin';
   Result.Template := 'auto';
   Result.UseGpu := False;
+  Result.GpuBudgetMB := 0;
 end;
 
 { TPrismRestServer }
@@ -200,12 +210,22 @@ begin
   FOpts := AOpts;
   FLog := ALog;
   FGenLock := TCriticalSection.Create;
+  FGen := nil;
   FTemplate := TemplateFromString(AOpts.Template);
 
   if AOpts.UseGpu then
   begin
-    if TryInitGpuBackend(GpuInfo) then
-      Log('GPU backend active: ' + GpuInfo)
+    { Bring the GPU up BEFORE the model is loaded: weights are uploaded lazily
+      on first use, so the backend has to exist by the time the first token
+      runs through the layers. }
+    if TryInitGpuBackend(GpuInfo, AOpts.GpuBudgetMB,
+         procedure(S: string) begin Log(S); end) then
+    begin
+      Log('GPU backend active: ' + GpuInfo);
+      if not GpuQuantizedActive then
+        Log('Note: quantized (GGUF) kernels are NOT on the GPU with this ' +
+            'backend - they stay on the CPU.');
+    end
     else
       Log('GPU not available (' + GpuInfo + '), using CPU.');
   end;
@@ -283,6 +303,7 @@ begin
   FHttp.Free;
   FVerifier.Free;
   FBackend.Free;
+  FGen.Free;
   FGenLock.Free;
   inherited;
 end;
@@ -558,43 +579,39 @@ begin
 
   FGenLock.Enter;
   try
-    Gen := TGenerator.Create(FBackend);
-    try
-      if Stream then
-      begin
-        if OllamaStyle then
-          BeginStream(AResponseInfo, 'application/x-ndjson')
-        else
-          BeginStream(AResponseInfo, 'text/event-stream');
-        if UseTools then
-          Gen.GenerateWithTools(PromptTokens, SP,
-            procedure(Chunk: string)
-            begin
-              StreamWrite(ChunkJson(Chunk, False));
-            end, Usage, ToolFn)
-        else
-          Gen.Generate(PromptTokens, SP,
-            procedure(Chunk: string)
-            begin
-              StreamWrite(ChunkJson(Chunk, False));
-            end, Usage);
-        StreamWrite(ChunkJson('', True));
-        if not OllamaStyle then
-          StreamWrite('[DONE]');
-        StreamEnd(AContext);
-        Exit;
-      end;
-      if UseTools then
-        Text := Gen.GenerateWithTools(PromptTokens, SP, nil, Usage, ToolFn)
+    Gen := SharedGenerator;
+    if Stream then
+    begin
+      if OllamaStyle then
+        BeginStream(AResponseInfo, 'application/x-ndjson')
       else
-        Text := Gen.Generate(PromptTokens, SP, nil, Usage);
-      { thematic areas: MoE routing histogram of this request }
-      if (Gen.Engine is TPrismEngine) and
-        (Length(TPrismEngine(Gen.Engine).ExpertHistogram) > 1) then
-        AreaHist := Copy(TPrismEngine(Gen.Engine).ExpertHistogram);
-    finally
-      Gen.Free;
+        BeginStream(AResponseInfo, 'text/event-stream');
+      if UseTools then
+        Gen.GenerateWithTools(PromptTokens, SP,
+          procedure(Chunk: string)
+          begin
+            StreamWrite(ChunkJson(Chunk, False));
+          end, Usage, ToolFn)
+      else
+        Gen.Generate(PromptTokens, SP,
+          procedure(Chunk: string)
+          begin
+            StreamWrite(ChunkJson(Chunk, False));
+          end, Usage);
+      StreamWrite(ChunkJson('', True));
+      if not OllamaStyle then
+        StreamWrite('[DONE]');
+      StreamEnd(AContext);
+      Exit;
     end;
+    if UseTools then
+      Text := Gen.GenerateWithTools(PromptTokens, SP, nil, Usage, ToolFn)
+    else
+      Text := Gen.Generate(PromptTokens, SP, nil, Usage);
+    { thematic areas: MoE routing histogram of this request }
+    if (Gen.Engine is TPrismEngine) and
+      (Length(TPrismEngine(Gen.Engine).ExpertHistogram) > 1) then
+      AreaHist := Copy(TPrismEngine(Gen.Engine).ExpertHistogram);
 
     if DoVerify then
       Ver := FVerifier.Verify(PromptTokens, LastUser, Text);
@@ -674,12 +691,8 @@ begin
   Id := NewId('cmpl-');
   FGenLock.Enter;
   try
-    Gen := TGenerator.Create(FBackend);
-    try
-      Text := Gen.Generate(Tokens, SP, nil, Usage);
-    finally
-      Gen.Free;
-    end;
+    Gen := SharedGenerator;
+    Text := Gen.Generate(Tokens, SP, nil, Usage);
   finally
     FGenLock.Leave;
   end;
@@ -745,24 +758,20 @@ begin
     Tokens := Tok.Encode(Prompt);
   FGenLock.Enter;
   try
-    Gen := TGenerator.Create(FBackend);
-    try
-      if Stream then
-      begin
-        BeginStream(AResponseInfo, 'application/x-ndjson');
-        Gen.Generate(Tokens, SP,
-          procedure(Chunk: string)
-          begin
-            StreamChunk(AContext, LineJson(Chunk, False) + #10);
-          end, Usage);
-        StreamChunk(AContext, LineJson('', True) + #10);
-        StreamEnd(AContext);
-        Exit;
-      end;
-      Text := Gen.Generate(Tokens, SP, nil, Usage);
-    finally
-      Gen.Free;
+    Gen := SharedGenerator;
+    if Stream then
+    begin
+      BeginStream(AResponseInfo, 'application/x-ndjson');
+      Gen.Generate(Tokens, SP,
+        procedure(Chunk: string)
+        begin
+          StreamChunk(AContext, LineJson(Chunk, False) + #10);
+        end, Usage);
+      StreamChunk(AContext, LineJson('', True) + #10);
+      StreamEnd(AContext);
+      Exit;
     end;
+    Text := Gen.Generate(Tokens, SP, nil, Usage);
   finally
     FGenLock.Leave;
   end;
@@ -855,6 +864,17 @@ begin
   SendJson(AResponseInfo, Root);
 end;
 
+{ Lazily built, then reused. MUST be called with FGenLock held -- which every
+  call site already does, since generations are serialised anyway. The engine
+  resets its position at the start of each Generate, so no state leaks between
+  requests. }
+function TPrismRestServer.SharedGenerator: TGenerator;
+begin
+  if FGen = nil then
+    FGen := TGenerator.Create(FBackend);
+  Result := FGen;
+end;
+
 procedure TPrismRestServer.HandleHealth(AResponseInfo: TIdHTTPResponseInfo);
 var
   Root: TJSONObject;
@@ -865,6 +885,8 @@ begin
   Root.AddPair('version', PRISM_VERSION);
   Root.AddPair('model', FBackend.ModelName);
   Root.AddPair('backend', Prism.Gpu.Backend.Name);
+  Root.AddPair('gpu', Prism.Gpu.GpuDetails);
+  Root.AddPair('gpu_quantized', TJSONBool.Create(Prism.Gpu.GpuQuantizedActive));
   Root.AddPair('training', TJSONBool.Create(FTrainSvc <> nil));
   SendJson(AResponseInfo, Root);
 end;

@@ -23,6 +23,8 @@ uses
   Prism.Tokenizer in '..\src\Prism.Tokenizer.pas',
   Prism.Model in '..\src\Prism.Model.pas',
   Prism.Streaming in '..\src\Prism.Streaming.pas',
+  Prism.Vulkan.Api in '..\src\Prism.Vulkan.Api.pas',
+  Prism.Vulkan in '..\src\Prism.Vulkan.pas',
   Prism.Gpu in '..\src\Prism.Gpu.pas',
   Prism.Laws in '..\src\Prism.Laws.pas',
   Prism.Inference in '..\src\Prism.Inference.pas',

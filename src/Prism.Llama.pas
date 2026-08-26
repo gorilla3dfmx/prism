@@ -12,7 +12,13 @@ unit Prism.Llama;
     devices with little RAM (cost: disk I/O per layer).
 
   The weights stay quantized (Q4/Q8) in memory and are consumed directly
-  by the fused kernels from Prism.Vector. }
+  by the fused kernels from Prism.Vector -- or, when a GPU backend is up, by
+  the matching Vulkan kernels with the same bytes resident in VRAM.
+
+  Streaming and the GPU work together but pull against each other: an evicted
+  layer must also release its VRAM copy (TLlamaLayer.Destroy does that), so a
+  small StreamLayers value means re-uploading over PCIe on every visit. If the
+  model fits in VRAM, StreamLayers = 0 is the right setting. }
 
 {$POINTERMATH ON}
 
@@ -21,7 +27,7 @@ interface
 uses
   System.SysUtils, System.Classes, System.Math, System.SyncObjs,
   System.Generics.Collections, System.Threading,
-  Prism.Types, Prism.Vector, Prism.Gguf;
+  Prism.Types, Prism.Vector, Prism.Gguf, Prism.Vulkan;
 
 type
   TLlamaConfig = record
@@ -45,6 +51,11 @@ type
     AttnNorm, FfnNorm: TArray<Single>;
     Bq, Bk, Bv: TArray<Single>; // optional biases (e.g. Qwen2)
     Wq, Wk, Wv, Wo, WGate, WDown, WUp: TQTensor;
+    { Frees the GPU-resident copies of this layer's tensors. MUST run before
+      the layer itself goes away: the compute backend keys residency on the
+      address of the weight bytes, and a later allocation could hand the same
+      address to a different tensor. }
+    destructor Destroy; override;
   end;
 
   TLlamaModel = class
@@ -224,6 +235,18 @@ begin
     Result.Bk := FGg.LoadTensorF32(P + 'attn_k.bias');
   if FGg.HasTensor(P + 'attn_v.bias') then
     Result.Bv := FGg.LoadTensorF32(P + 'attn_v.bias');
+end;
+
+destructor TLlamaLayer.Destroy;
+begin
+  VulkanEvict(Wq);
+  VulkanEvict(Wk);
+  VulkanEvict(Wv);
+  VulkanEvict(Wo);
+  VulkanEvict(WGate);
+  VulkanEvict(WDown);
+  VulkanEvict(WUp);
+  inherited;
 end;
 
 function TLlamaModel.GetLayer(L: Integer): TLlamaLayer;

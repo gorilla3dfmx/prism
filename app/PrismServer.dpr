@@ -15,19 +15,30 @@ program PrismServer;
     --verify            self-verification enabled by default
     --train             online finetuning via POST /api/train (.prism only)
     --template T        auto | prism | chatml | llama2 | plain
-    --gpu               try the OpenCL GPU backend }
+    --gpu               enable the GPU backend (Vulkan; OpenCL as fallback)
+    --gpu-budget MB     cap the VRAM used for weights (0 = derive from device).
+                        Less than the model needs is fine: the tensors that fit
+                        run on the GPU, the rest stays on the CPU.
+    --gpu-device N|name pick a specific GPU (same effect as PRISM_VK_DEVICE) }
 
 {$APPTYPE CONSOLE}
 
 uses
   System.SysUtils,
   System.Classes,
+{$IFDEF MSWINDOWS}
+  Winapi.Windows,
+{$ELSE}
+  Posix.Stdlib,
+{$ENDIF}
   Prism.Types in '..\src\Prism.Types.pas',
   Prism.Vector in '..\src\Prism.Vector.pas',
   Prism.Tensor in '..\src\Prism.Tensor.pas',
   Prism.Tokenizer in '..\src\Prism.Tokenizer.pas',
   Prism.Model in '..\src\Prism.Model.pas',
   Prism.Streaming in '..\src\Prism.Streaming.pas',
+  Prism.Vulkan.Api in '..\src\Prism.Vulkan.Api.pas',
+  Prism.Vulkan in '..\src\Prism.Vulkan.pas',
   Prism.Gpu in '..\src\Prism.Gpu.pas',
   Prism.Laws in '..\src\Prism.Laws.pas',
   Prism.Inference in '..\src\Prism.Inference.pas',
@@ -46,6 +57,18 @@ begin
   for I := 1 to ParamCount - 1 do
     if SameText(ParamStr(I), '--' + Name) then
       Exit(ParamStr(I + 1));
+end;
+
+{ The device choice is read from the environment by Prism.Vulkan, so --gpu-device
+  is just a friendlier spelling of setting PRISM_VK_DEVICE. }
+procedure SetEnvVar(const Name, Value: string);
+begin
+{$IFDEF MSWINDOWS}
+  Winapi.Windows.SetEnvironmentVariable(PChar(Name), PChar(Value));
+{$ELSE}
+  Posix.Stdlib.setenv(PAnsiChar(AnsiString(Name)),
+    PAnsiChar(AnsiString(Value)), 1);
+{$ENDIF}
 end;
 
 function HasArg(const Name: string): Boolean;
@@ -77,6 +100,9 @@ begin
     Opts.CorpusPath := ArgValue('corpus', 'corpus.bin');
     Opts.Template := ArgValue('template', 'auto');
     Opts.UseGpu := HasArg('gpu');
+    Opts.GpuBudgetMB := StrToIntDef(ArgValue('gpu-budget', '0'), 0);
+    if ArgValue('gpu-device', '') <> '' then
+      SetEnvVar('PRISM_VK_DEVICE', ArgValue('gpu-device', ''));
 
     if Opts.ModelPath = '' then
     begin
