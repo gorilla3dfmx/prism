@@ -103,8 +103,9 @@ foreach ($name in $variants.Keys) {
     $qtype = $variants[$name]
     $spv   = Join-Path $tmp "matvec_$name.spv"
 
+    # vulkan1.1 (SPIR-V 1.3): required by the subgroup reduction in main().
     $cargs = @('-fshader-stage=comp', "-DQTYPE=$qtype",
-              '--target-env=vulkan1.0', '-o', $spv)
+              '--target-env=vulkan1.1', '-o', $spv)
     if (-not $KeepDebugInfo) { $cargs += '-O' }
     $cargs += $shaderSrc
 

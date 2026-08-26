@@ -157,6 +157,7 @@ type
     FQueue: TVkQueue;
     FQueueFamily: UInt32;
     FProps: TVkPhysicalDeviceProperties;
+    FSubgroupSize: UInt32;
     FMemProps: TVkPhysicalDeviceMemoryProperties;
 
     FModules: array [0 .. 14] of TVkShaderModule;
@@ -427,6 +428,7 @@ var
   ICI: TVkInstanceCreateInfo;
   Res: TVkResult;
   ExtName: PAnsiChar;
+  LoaderVer: UInt32;
 begin
   FillChar(AI, SizeOf(AI), 0);
   AI.sType := VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -434,7 +436,35 @@ begin
   AI.applicationVersion := VK_MAKE_VERSION(1, 0, 0);
   AI.pEngineName := 'Prism';
   AI.engineVersion := VK_MAKE_VERSION(1, 0, 0);
-  AI.apiVersion := VK_MAKE_VERSION(1, 0, 0);
+  { VULKAN 1.1 IS NOW A REQUIREMENT.
+
+    The MatVec reduction uses subgroupAdd, which is core 1.1. Asking for 1.1
+    in the ApplicationInfo is what makes a 1.1 instance; on a 1.0 loader
+    vkCreateInstance would answer VK_ERROR_INCOMPATIBLE_DRIVER, so the loader
+    version is checked first and the failure reported in those words rather
+    than as an obscure driver error.
+
+    1.1 dates from 2018 and is required of every Android device shipping
+    Vulkan since Android 10; MoltenVK covers iOS and macOS. A device that
+    cannot do it falls back to the CPU path, as it does for any other reason
+    the GPU is unusable. }
+  AI.apiVersion := VK_MAKE_VERSION(1, 1, 0);
+
+  if not Assigned(FApi.EnumerateInstanceVersion) then
+  begin
+    Why := 'Vulkan loader is 1.0 only (vkEnumerateInstanceVersion missing); '
+      + 'Prism needs 1.1 for subgroup reductions';
+    Exit(False);
+  end;
+  LoaderVer := 0;
+  if (FApi.EnumerateInstanceVersion(LoaderVer) <> VK_SUCCESS) or
+     (VK_VERSION_MAJOR(LoaderVer) < 1) or
+     ((VK_VERSION_MAJOR(LoaderVer) = 1) and (VK_VERSION_MINOR(LoaderVer) < 1)) then
+  begin
+    Why := Format('Vulkan loader reports %d.%d, Prism needs 1.1',
+      [VK_VERSION_MAJOR(LoaderVer), VK_VERSION_MINOR(LoaderVer)]);
+    Exit(False);
+  end;
 
   FillChar(ICI, SizeOf(ICI), 0);
   ICI.sType := VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -467,6 +497,9 @@ var
   Devices: TArray<TVkPhysicalDevice>;
   P: TVkPhysicalDeviceProperties;
   MP: TVkPhysicalDeviceMemoryProperties;
+  P2: TVkPhysicalDeviceProperties2;
+  SGP: TVkPhysicalDeviceSubgroupProperties;
+  Need: TVkFlags;
   QCount: UInt32;
   Fams: TArray<TVkQueueFamilyProperties>;
   Score, BestScore: Int64;
@@ -571,6 +604,44 @@ begin
     if (FMemProps.memoryHeaps[I].flags and VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) <> 0 then
       if Int64(FMemProps.memoryHeaps[I].size) > FVram then
         FVram := Int64(FMemProps.memoryHeaps[I].size);
+
+  { The kernel reduces with subgroupAdd, so the device has to offer subgroup
+    arithmetic in the compute stage. Refusing here, by name, beats letting
+    pipeline creation fail later with nothing to go on. }
+  if (VK_VERSION_MAJOR(FProps.apiVersion) = 1) and
+     (VK_VERSION_MINOR(FProps.apiVersion) < 1) then
+  begin
+    Why := Format('%s speaks Vulkan %d.%d; Prism needs 1.1',
+      [FDeviceName, VK_VERSION_MAJOR(FProps.apiVersion),
+       VK_VERSION_MINOR(FProps.apiVersion)]);
+    Exit(False);
+  end;
+  if not Assigned(FApi.GetPhysicalDeviceProperties2) then
+  begin
+    Why := 'vkGetPhysicalDeviceProperties2 missing on a 1.1 instance';
+    Exit(False);
+  end;
+
+  FillChar(SGP, SizeOf(SGP), 0);
+  SGP.sType := VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+  FillChar(P2, SizeOf(P2), 0);
+  P2.sType := VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+  P2.pNext := @SGP;
+  FApi.GetPhysicalDeviceProperties2(FPhysical, @P2);
+
+  Need := VK_SUBGROUP_FEATURE_BASIC_BIT or VK_SUBGROUP_FEATURE_ARITHMETIC_BIT;
+  if (SGP.supportedStages and VK_SHADER_STAGE_COMPUTE_BIT) = 0 then
+  begin
+    Why := FDeviceName + ': no subgroup operations in the compute stage';
+    Exit(False);
+  end;
+  if (SGP.supportedOperations and Need) <> Need then
+  begin
+    Why := FDeviceName + ': subgroup arithmetic not supported';
+    Exit(False);
+  end;
+  FSubgroupSize := SGP.subgroupSize;
+
   Result := True;
 end;
 

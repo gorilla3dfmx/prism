@@ -91,6 +91,14 @@ const
 
   { structure types }
   VK_STRUCTURE_TYPE_APPLICATION_INFO                = 0;
+  { Vulkan 1.1 core, needed to read the subgroup properties }
+  VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2        = 1000059001;
+  VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES = 1000094000;
+
+  { VkSubgroupFeatureFlagBits -- the kernel reduction needs BASIC (for
+    gl_SubgroupID / gl_NumSubgroups) and ARITHMETIC (for subgroupAdd). }
+  VK_SUBGROUP_FEATURE_BASIC_BIT      = $00000001;
+  VK_SUBGROUP_FEATURE_ARITHMETIC_BIT = $00000004;
   VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO            = 1;
   VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO        = 2;
   VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO              = 3;
@@ -314,6 +322,18 @@ type
     residencyNonResidentStrict: TVkBool32;
   end;
 
+  { Chained behind TVkPhysicalDeviceProperties2. Declared before it so the
+    pNext target is a known type at the point of use. }
+  TVkPhysicalDeviceSubgroupProperties = record
+    sType: UInt32;
+    pNext: Pointer;
+    subgroupSize: UInt32;
+    supportedStages: TVkFlags;
+    supportedOperations: TVkFlags;
+    quadOperationsInAllStages: TVkBool32;
+  end;
+  PVkPhysicalDeviceSubgroupProperties = ^TVkPhysicalDeviceSubgroupProperties;
+
   TVkPhysicalDeviceProperties = record
     apiVersion: UInt32;
     driverVersion: UInt32;
@@ -326,6 +346,13 @@ type
     sparseProperties: TVkPhysicalDeviceSparseProperties;
   end;
   PVkPhysicalDeviceProperties = ^TVkPhysicalDeviceProperties;
+
+  TVkPhysicalDeviceProperties2 = record
+    sType: UInt32;
+    pNext: Pointer;
+    properties: TVkPhysicalDeviceProperties;
+  end;
+  PVkPhysicalDeviceProperties2 = ^TVkPhysicalDeviceProperties2;
 
   TVkMemoryType = record
     propertyFlags: TVkFlags;
@@ -758,6 +785,14 @@ type
     pFences: PVkFence): TVkResult;
     {$IFDEF MSWINDOWS} stdcall {$ELSE} cdecl {$ENDIF};
 
+  { Both are Vulkan 1.1. Absent on a 1.0 loader, which is exactly how their
+    absence is detected -- see VkLoadGlobalProcs / VkLoadInstanceProcs. }
+  TvkEnumerateInstanceVersion = function(var ApiVersion: UInt32): TVkResult;
+    {$IFDEF MSWINDOWS} stdcall {$ELSE} cdecl {$ENDIF};
+  TvkGetPhysicalDeviceProperties2 = procedure(PhysicalDevice: TVkPhysicalDevice;
+    pProperties: PVkPhysicalDeviceProperties2);
+    {$IFDEF MSWINDOWS} stdcall {$ELSE} cdecl {$ENDIF};
+
 type
   { Everything Prism calls, grouped so the backend can hold one instance and
     so a failed symbol lookup is a single, obvious check. }
@@ -769,6 +804,9 @@ type
     DestroyInstance: TvkDestroyInstance;
     EnumeratePhysicalDevices: TvkEnumeratePhysicalDevices;
     GetPhysicalDeviceProperties: TvkGetPhysicalDeviceProperties;
+    { Vulkan 1.1; nil on an older loader/driver -- always test before calling }
+    EnumerateInstanceVersion: TvkEnumerateInstanceVersion;
+    GetPhysicalDeviceProperties2: TvkGetPhysicalDeviceProperties2;
     GetPhysicalDeviceMemoryProperties: TvkGetPhysicalDeviceMemoryProperties;
     GetPhysicalDeviceQueueFamilyProperties
       : TvkGetPhysicalDeviceQueueFamilyProperties;
@@ -964,6 +1002,10 @@ begin
   end;
 
   { global commands: instance handle must be nil }
+  { Vulkan 1.1 only. Missing means a 1.0 loader; not an error here, the caller
+    decides what to do without it. }
+  Api.EnumerateInstanceVersion := TvkEnumerateInstanceVersion(
+    Api.GetInstanceProcAddr(nil, 'vkEnumerateInstanceVersion'));
   Api.CreateInstance :=
     TvkCreateInstance(Api.GetInstanceProcAddr(nil, 'vkCreateInstance'));
   if not Assigned(Api.CreateInstance) then
@@ -1004,6 +1046,11 @@ begin
       G('vkEnumerateDeviceExtensionProperties'));
   Api.CreateDevice := TvkCreateDevice(G('vkCreateDevice'));
   Api.GetDeviceProcAddr := TvkGetDeviceProcAddr(G('vkGetDeviceProcAddr'));
+
+  { Deliberately NOT through G(): on a 1.0 instance this is absent, and that
+    must not read as a broken loader. The subgroup check handles the nil. }
+  Api.GetPhysicalDeviceProperties2 := TvkGetPhysicalDeviceProperties2(
+    Api.GetInstanceProcAddr(Instance, 'vkGetPhysicalDeviceProperties2'));
 
   Why := Trim(Missing);
   Result := Why = '';

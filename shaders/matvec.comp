@@ -1,5 +1,10 @@
 #version 450
 
+/* Vulkan 1.1: the cross-lane reduction at the bottom of main() uses
+   subgroupAdd instead of a shared-memory tree. See the note there. */
+#extension GL_KHR_shader_subgroup_basic      : require
+#extension GL_KHR_shader_subgroup_arithmetic : require
+
 /* Prism -- fused quantized MatVec compute shader (y = W * x).
  *
  * ONE source, compiled eight times with -DQTYPE=<ggml type id>.
@@ -80,6 +85,9 @@ layout(push_constant) uniform PC {
     uint yOff;      // element offset of y inside YBuf
 } pc;
 
+/* One slot per subgroup, never per lane: with subgroupAdd the workgroup only
+   has to combine gl_NumSubgroups partial sums. LOCAL_SIZE slots is the
+   worst case (a subgroup size of 1) and costs 256 bytes. */
 shared float sred[LOCAL_SIZE];
 
 /* ---- access into the weight buffer ----
@@ -342,14 +350,21 @@ void main() {
 
     /* One reduction per row -- amortised over the whole row instead of being
        repeated per block, which was the other half of why the previous
-       decomposition was slow. */
-    sred[tid] = acc;
+       decomposition was slow.
+
+       subgroupAdd folds each subgroup in hardware, so what used to be six
+       barriers is now one: every subgroup writes a single partial, and lane 0
+       adds up the handful that remain. The call sits in unconditional control
+       flow on purpose -- rows past the end contribute a zero rather than
+       dropping out of the subgroup. */
+    float part = subgroupAdd(acc);
+    if (subgroupElect())
+        sred[gl_SubgroupID] = part;
     barrier();
-    for (uint s = uint(LOCAL_SIZE) / 2u; s > 0u; s >>= 1u) {
-        if (tid < s)
-            sred[tid] += sred[tid + s];
-        barrier();
+    if (tid == 0u && row < pc.rows) {
+        float total = 0.0;
+        for (uint i = 0u; i < gl_NumSubgroups; ++i)
+            total += sred[i];
+        yv[pc.yOff + row] = total;
     }
-    if (tid == 0u && row < pc.rows)
-        yv[pc.yOff + row] = sred[0];
 }

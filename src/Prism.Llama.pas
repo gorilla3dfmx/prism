@@ -91,6 +91,11 @@ type
     FKCacheCur, FVCacheCur: TArray<Single>; // cache of the current layer
     FX, FXb, FQ, FK, FV, FAttOut, FHb, FHb2, FLogits: TArray<Single>;
     FInvFreq: TArray<Single>;
+    { Ein Bewertungspuffer JE KOPF, einmal angelegt. Vorher holte sich jeder
+      Kopf sein Feld in der Schleife selbst -- bei 32 Koepfen und 32 Schichten
+      sind das 1024 Speicheranforderungen je Token, und zwar aus 16 Threads
+      gleichzeitig, die sich dabei um denselben Speicherverwalter druecken. }
+    FAttScratch: TArray<TArray<Single>>;
     procedure Rope(Vec: PSingle; NHeadsVec, Pos: Integer);
     procedure Attention;
   public
@@ -295,6 +300,12 @@ begin
   SetLength(FInvFreq, HD div 2);
   for I := 0 to HD div 2 - 1 do
     FInvFreq[I] := Power(FModel.Cfg.RopeBase, -2.0 * I / HD);
+  { Voll auf Kontextlaenge -- der Puffer waechst nie waehrend eines Laufs.
+    Kosten: NHeads x CtxLen Gleitkommazahlen, bei 32 Koepfen und 4096 Kontext
+    eine halbe Megabyte je Maschine. }
+  SetLength(FAttScratch, FModel.Cfg.NHeads);
+  for I := 0 to FModel.Cfg.NHeads - 1 do
+    SetLength(FAttScratch[I], FModel.Cfg.CtxLen);
   Reset;
 end;
 
@@ -386,12 +397,12 @@ begin
   TParallel.&For(0, NH - 1,
     procedure(H: Integer)
     var
-      Att: TArray<Single>;
+      Att: PSingle;
       T2, I, KvOff: Integer;
       S: Single;
       Q, O: PSingle;
     begin
-      SetLength(Att, Pos + 1);
+      Att := @FAttScratch[H][0];
       Q := PSingle(@FQ[0]) + H * HD;
       KvOff := (H div Group) * HD;
       for T2 := 0 to Pos do
@@ -401,7 +412,7 @@ begin
           S := S + Q[I] * FKCacheCur[Int64(T2) * KvDim + KvOff + I];
         Att[T2] := S * Scale;
       end;
-      SoftmaxVec(@Att[0], Pos + 1);
+      SoftmaxVec(Att, Pos + 1);
       O := PSingle(@FAttOut[0]) + H * HD;
       for I := 0 to HD - 1 do
         O[I] := 0;
