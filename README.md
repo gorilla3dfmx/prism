@@ -134,6 +134,17 @@ curl http://localhost:11434/v1/chat/completions -d '{
 }'
 ```
 
+```cmd
+curl http://127.0.0.1:11434/v1/chat/completions -d "{
+  \"model\": \"prism\",
+  \"messages\": [{\"role\": \"user\", \"content\": \"Was ist die Hauptstadt von Deutschland?\"}],
+  \"temperature\": 0.7,
+  \"max_tokens\": 128,
+  \"stream\": false,
+  \"verify\": true
+}"
+```
+
 With `"verify": true`, the response additionally contains:
 
 ```json
