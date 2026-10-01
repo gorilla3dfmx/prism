@@ -9,6 +9,7 @@ Prism is an LLM framework implemented entirely in **Delphi 13** — **without th
 | **Train** your own GPT-style transformer models (full backprop, AdamW) | ✅ |
 | **Load existing trained LLMs**: GGUF binary format (llama.cpp ecosystem) | ✅ |
 | Llama-architecture inference: RMSNorm, RoPE, GQA, SwiGLU | ✅ |
+| Gemma 4 inference (E2B/E4B/12B): sliding window, shared KV, per-layer embeddings | ✅ |
 | Quantized inference: Q4_0, Q4_1, Q8_0, Q4_K, Q5_K, Q6_K, F16, F32 (fused kernels) | ✅ |
 | **Clustering / layer streaming**: the model does not have to fit entirely in RAM | ✅ |
 | **Mixture-of-Experts** ("thematic areas", top-1 routing) incl. training | ✅ |
@@ -41,6 +42,8 @@ E:\delphi\projects\prism\
 │   ├── Prism.Streaming.pas     Layer/expert cluster streaming (LRU) for .prism
 │   ├── Prism.Gguf.pas          GGUF reader + SPM/GPT2 tokenizer from metadata
 │   ├── Prism.Llama.pas         Llama-architecture engine (GGUF), layer streaming
+│   ├── Prism.Gemma4.pas        Gemma 4 engine (GGUF)
+│   ├── Prism.GgufModels.pas    picks the engine from general.architecture
 │   ├── Prism.Inference.pas     Custom engine (incl. MoE), generator, sampling
 │   ├── Prism.Train.pas         Trainer (AdamW, MoE backprop), online training
 │   ├── Prism.Verify.pas        Self-verification
@@ -114,7 +117,7 @@ With limited RAM (e.g. on mobile), enable layer streaming — only N transformer
 PrismServer --model models\mistral-7b.Q4_0.gguf --ctx 512 --stream-layers 6
 ```
 
-Supported: GGUF v2/v3, tensor types **F32, F16, Q4_0, Q4_1, Q8_0, Q4_K, Q5_K, Q6_K** — which covers the usual `Q4_K_M` / `Q5_K_M` downloads; convert anything else (Q2_K, Q3_K, IQ*, …) with `llama-quantize`. Architectures of the Llama family (llama, mistral, qwen2, …), tokenizers `llama` (SentencePiece) and `gpt2` (byte BPE).
+Supported: GGUF v2/v3, tensor types **F32, F16, Q4_0, Q4_1, Q8_0, Q4_K, Q5_K, Q6_K** (BF16 is widened to F32 on load) — which covers the usual `Q4_K_M` / `Q5_K_M` downloads; convert anything else (Q2_K, Q3_K, IQ*, …) with `llama-quantize`. Architectures of the Llama family (llama, mistral, qwen2, …) and `gemma4` (dense; MoE not yet), detected automatically from `general.architecture`; tokenizers `llama` (SentencePiece), `gpt2` (byte BPE) and `gemma4`.
 
 ## Quick start B: Train your own model
 

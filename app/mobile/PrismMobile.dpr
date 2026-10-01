@@ -20,6 +20,8 @@ uses
   Prism.Inference in '..\..\src\Prism.Inference.pas',
   Prism.Gguf in '..\..\src\Prism.Gguf.pas',
   Prism.Llama in '..\..\src\Prism.Llama.pas',
+  Prism.Gemma4 in '..\..\src\Prism.Gemma4.pas',
+  Prism.GgufModels in '..\..\src\Prism.GgufModels.pas',
   Prism.Train in '..\..\src\Prism.Train.pas',
   Prism.Multimodal in '..\..\src\Prism.Multimodal.pas',
   Prism.Verify in '..\..\src\Prism.Verify.pas',

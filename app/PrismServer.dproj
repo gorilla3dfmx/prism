@@ -242,6 +242,8 @@
         <DCCReference Include="..\src\Prism.Inference.pas"/>
         <DCCReference Include="..\src\Prism.Gguf.pas"/>
         <DCCReference Include="..\src\Prism.Llama.pas"/>
+        <DCCReference Include="..\src\Prism.Gemma4.pas"/>
+        <DCCReference Include="..\src\Prism.GgufModels.pas"/>
         <DCCReference Include="..\src\Prism.Train.pas"/>
         <DCCReference Include="..\src\Prism.Multimodal.pas"/>
         <DCCReference Include="..\src\Prism.Verify.pas"/>

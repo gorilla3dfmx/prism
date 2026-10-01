@@ -120,20 +120,23 @@ type
     function Position: Integer; override;
   end;
 
-  TLlamaBackend = class(TLlmBackend)
+  TLlamaBackend = class(TGgufBackend)
   private
     FModel: TLlamaModel;
-    FTok: TGgufTokenizerBase;
-    FTemplate: TChatTemplate;
+  protected
+    function GetArch: string; override;
+    function GetVocab: Integer; override;
+    function GetContextLength: Integer; override;
   public
     constructor Create(const Path: string; CtxOverride: Integer;
-      StreamLayers: Integer; const Log: TProc<string>);
+      StreamLayers: Integer; const Log: TProc<string>); overload;
+    { Takes ownership of Gg (Prism.GgufModels has already opened it to read
+      the architecture). }
+    constructor Create(Gg: TGgufFile; CtxOverride: Integer;
+      StreamLayers: Integer; const Log: TProc<string>); overload;
     destructor Destroy; override;
     function CreateEngine: TLlmEngine; override;
-    function Tokenizer: TLlmTokenizerBase; override;
     function ModelName: string; override;
-    function DefaultTemplate: TChatTemplate; override;
-    property Template: TChatTemplate read FTemplate write FTemplate;
     property Model: TLlamaModel read FModel;
   end;
 
@@ -522,11 +525,14 @@ end;
 
 constructor TLlamaBackend.Create(const Path: string; CtxOverride: Integer;
   StreamLayers: Integer; const Log: TProc<string>);
-var
-  Gg: TGgufFile;
+begin
+  Create(TGgufFile.Create(Path), CtxOverride, StreamLayers, Log);
+end;
+
+constructor TLlamaBackend.Create(Gg: TGgufFile; CtxOverride: Integer;
+  StreamLayers: Integer; const Log: TProc<string>);
 begin
   inherited Create;
-  Gg := TGgufFile.Create(Path);
   FModel := TLlamaModel.Create(Gg, CtxOverride, StreamLayers, Log);
   FTok := CreateGgufTokenizer(Gg);
   FTemplate := ctAuto;
@@ -534,9 +540,8 @@ end;
 
 destructor TLlamaBackend.Destroy;
 begin
-  FTok.Free;
   FModel.Free; // also frees the TGgufFile
-  inherited;
+  inherited;   // frees the tokenizer
 end;
 
 function TLlamaBackend.CreateEngine: TLlmEngine;
@@ -544,22 +549,24 @@ begin
   Result := TLlamaEngine.Create(FModel);
 end;
 
-function TLlamaBackend.Tokenizer: TLlmTokenizerBase;
-begin
-  Result := FTok;
-end;
-
 function TLlamaBackend.ModelName: string;
 begin
   Result := FModel.Name;
 end;
 
-function TLlamaBackend.DefaultTemplate: TChatTemplate;
+function TLlamaBackend.GetArch: string;
 begin
-  if FTemplate <> ctAuto then
-    Result := FTemplate
-  else
-    Result := FTok.AutoTemplate;
+  Result := FModel.Gguf.Arch;
+end;
+
+function TLlamaBackend.GetVocab: Integer;
+begin
+  Result := FModel.Cfg.Vocab;
+end;
+
+function TLlamaBackend.GetContextLength: Integer;
+begin
+  Result := FModel.Cfg.CtxLen;
 end;
 
 end.

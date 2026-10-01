@@ -6,13 +6,16 @@ unit Prism.Gguf;
 
   Supports:
   - GGUF versions 2 and 3
-  - tensor types F32, F16, Q4_0, Q4_1, Q8_0 (others -> requantize,
-    e.g. with llama-quantize to Q8_0/Q4_0)
-  - embedded tokenizers: 'llama' (SentencePiece) and 'gpt2' (byte BPE)
+  - tensor types F32, F16, Q4_0, Q4_1, Q8_0, Q4_K, Q5_K, Q6_K; BF16 is
+    widened to F32 on load (others -> requantize, e.g. with llama-quantize)
+  - embedded tokenizers: 'llama' (SentencePiece), 'gpt2' (byte BPE) and
+    'gemma4' (BPE over SentencePiece-escaped text)
 
   All offsets/sizes are Int64 - models with billions of parameters
   and files > 4 GB are fully addressable. The stream stays open so
   that Prism.Llama can stream tensors layer by layer. }
+
+{$POINTERMATH ON}
 
 interface
 
@@ -39,6 +42,10 @@ type
     Typ: TGgmlType;
     Dims: TArray<Int64>; // Dims[0] = columns (fastest dimension)
     Offset: Int64;       // relative to the data section
+    { BF16 has no kernel of its own: the bytes are widened to F32 on load
+      (Typ then reads gtF32). Only small tensors come as BF16 in practice --
+      Gemma 4 ships its per-layer projection that way. }
+    Bf16: Boolean;
     function Rows: Int64;
     function Cols: Int64;
   end;
@@ -87,6 +94,7 @@ type
     FAddBos: Boolean;
     FStopIds: TList<Integer>;
     FAutoTemplate: TChatTemplate;
+    FHiddenOpen, FHiddenClose: Integer; // -1 = none
     function PieceId(const Piece: string): Integer;
     procedure DetectTemplate;
     procedure AppendChat(Res: TList<Integer>; const Msgs: TChatMessages;
@@ -99,6 +107,8 @@ type
     function EosId: Integer; override;
     function IsStopToken(Id: Integer): Boolean; override;
     function PrependBos: Boolean; override;
+    function IsHiddenOpen(Id: Integer): Boolean; override;
+    function IsHiddenClose(Id: Integer): Boolean; override;
     function BuildChatTokens(const Msgs: TChatMessages;
       Template: TChatTemplate): TArray<Integer>; override;
     property AutoTemplate: TChatTemplate read FAutoTemplate;
@@ -128,6 +138,43 @@ type
     destructor Destroy; override;
     function Encode(const Text: string): TArray<Integer>; override;
     function TokenBytes(Id: Integer): TBytes; override;
+  end;
+
+  { Gemma 4 (tokenizer.ggml.model = 'gemma4'): BPE merges like GPT-2, but on
+    raw UTF-8 with spaces escaped to U+2581 the SentencePiece way, and with
+    <0xXX> byte tokens as fallback. The only pre-split is at newline runs
+    (llama.cpp LLAMA_VOCAB_PRE_TYPE_GEMMA4). }
+  TGemma4Tokenizer = class(TGgufTokenizerBase)
+  private
+    FMergeRank: TDictionary<string, Integer>;
+    FByteTok: array [0 .. 255] of Integer;
+    procedure EncodeWord(const Word: string; Res: TList<Integer>);
+  public
+    constructor Create(Gg: TGgufFile);
+    destructor Destroy; override;
+    function Encode(const Text: string): TArray<Integer>; override;
+    function TokenBytes(Id: Integer): TBytes; override;
+  end;
+
+  { Common face of every GGUF-backed model, whatever its architecture:
+    the REST server only needs the tokenizer, the template and a few numbers
+    for the log line. Prism.GgufModels picks the concrete class from
+    general.architecture. }
+  TGgufBackend = class(TLlmBackend)
+  protected
+    FTok: TGgufTokenizerBase;
+    FTemplate: TChatTemplate;
+    function GetArch: string; virtual; abstract;
+    function GetVocab: Integer; virtual; abstract;
+    function GetContextLength: Integer; virtual; abstract;
+  public
+    destructor Destroy; override;
+    function Tokenizer: TLlmTokenizerBase; override;
+    function DefaultTemplate: TChatTemplate; override;
+    property Template: TChatTemplate read FTemplate write FTemplate;
+    property Arch: string read GetArch;
+    property Vocab: Integer read GetVocab;
+    property ContextLength: Integer read GetContextLength;
   end;
 
 function CreateGgufTokenizer(Gg: TGgufFile): TGgufTokenizerBase;
@@ -207,6 +254,7 @@ begin
     for D := 0 to Integer(NDims) - 1 do
       Info.Dims[D] := Int64(ReadU64);
     TypRaw := ReadU32;
+    Info.Bf16 := TypRaw = 30;
     case TypRaw of
       0: Info.Typ := gtF32;
       1: Info.Typ := gtF16;
@@ -216,6 +264,7 @@ begin
       12: Info.Typ := gtQ4_K;
       13: Info.Typ := gtQ5_K;
       14: Info.Typ := gtQ6_K;
+      30: Info.Typ := gtF32; // BF16, widened in LoadTensor
     else
       Info.Typ := TGgmlType(-1); // rejected on load, metadata is fine
     end;
@@ -292,7 +341,9 @@ begin
     4: begin FStream.ReadBuffer(U32, 4); Result.Kind := gvInt; Result.I := U32; end;
     5: begin FStream.ReadBuffer(I32, 4); Result.Kind := gvInt; Result.I := I32; end;
     6: begin FStream.ReadBuffer(F32, 4); Result.Kind := gvFloat; Result.F := F32; end;
-    7: begin FStream.ReadBuffer(B8, 1); Result.Kind := gvBool; Result.B := B8 <> 0; end;
+    { I is set too: inside an array the element lands in the Int64 list
+      (Gemma 4's sliding_window_pattern is an array of bools). }
+    7: begin FStream.ReadBuffer(B8, 1); Result.Kind := gvBool; Result.B := B8 <> 0; Result.I := Ord(B8 <> 0); end;
     8: begin Result.Kind := gvStr; Result.S := ReadStr; end;
     10: begin FStream.ReadBuffer(U64, 8); Result.Kind := gvInt; Result.I := Int64(U64); end;
     11: begin FStream.ReadBuffer(I64, 8); Result.Kind := gvInt; Result.I := I64; end;
@@ -440,7 +491,10 @@ end;
 function TGgufFile.LoadTensor(const Name: string): TQTensor;
 var
   Info: TGgufTensorInfo;
-  Bytes: Int64;
+  Bytes, N, I: Int64;
+  Raw: TBytes;
+  Src: PWord;
+  Dst: PCardinal;
 begin
   Info := TensorInfo(Name);
   if Integer(Info.Typ) = -1 then
@@ -454,6 +508,25 @@ begin
   Result.Typ := Info.Typ;
   Result.Rows := Integer(Info.Rows);
   Result.Cols := Integer(Info.Cols);
+  if Info.Bf16 then
+  begin
+    { BF16 is the upper half of an F32: shifting it back up is exact. }
+    N := Int64(Result.Rows) * Result.Cols;
+    SetLength(Raw, N * 2);
+    FLock.Enter;
+    try
+      FStream.Position := FDataOffset + Info.Offset;
+      FStream.ReadBuffer(Raw[0], N * 2);
+    finally
+      FLock.Leave;
+    end;
+    SetLength(Result.Data, Result.TotalBytes);
+    Src := PWord(@Raw[0]);
+    Dst := PCardinal(@Result.Data[0]);
+    for I := 0 to N - 1 do
+      Dst[I] := Cardinal(Src[I]) shl 16;
+    Exit;
+  end;
   Bytes := Result.TotalBytes;
   SetLength(Result.Data, Bytes);
   FLock.Enter;
@@ -539,6 +612,16 @@ begin
   Result := FAddBos and (FBos >= 0);
 end;
 
+function TGgufTokenizerBase.IsHiddenOpen(Id: Integer): Boolean;
+begin
+  Result := (FHiddenOpen >= 0) and (Id = FHiddenOpen);
+end;
+
+function TGgufTokenizerBase.IsHiddenClose(Id: Integer): Boolean;
+begin
+  Result := (FHiddenClose >= 0) and (Id = FHiddenClose);
+end;
+
 function TGgufTokenizerBase.PieceId(const Piece: string): Integer;
 begin
   if not FVocab.TryGetValue(Piece, Result) then
@@ -547,9 +630,22 @@ end;
 
 procedure TGgufTokenizerBase.DetectTemplate;
 var
-  ImEnd: Integer;
+  ImEnd, TurnEnd: Integer;
 begin
-  if PieceId('<|im_start|>') >= 0 then
+  FHiddenOpen := -1;
+  FHiddenClose := -1;
+  if PieceId('<|turn>') >= 0 then
+  begin
+    FAutoTemplate := ctGemma;
+    TurnEnd := PieceId('<turn|>');
+    if (TurnEnd >= 0) and not FStopIds.Contains(TurnEnd) then
+      FStopIds.Add(TurnEnd);
+    { Some Gemma 4 finetunes open every answer with an (empty) thought
+      channel even with thinking off. }
+    FHiddenOpen := PieceId('<|channel>');
+    FHiddenClose := PieceId('<channel|>');
+  end
+  else if PieceId('<|im_start|>') >= 0 then
   begin
     FAutoTemplate := ctChatML;
     ImEnd := PieceId('<|im_end|>');
@@ -566,7 +662,7 @@ procedure TGgufTokenizerBase.AppendChat(Res: TList<Integer>;
   const Msgs: TChatMessages; Template: TChatTemplate);
 var
   M: TChatMessage;
-  SysText, UserBuf, T: string;
+  SysText, UserBuf, T, Role: string;
   ImStart, ImEnd: Integer;
   First: Boolean;
 
@@ -596,6 +692,29 @@ begin
         end;
         Res.Add(ImStart);
         AppendText('assistant' + #10);
+      end;
+    ctGemma:
+      begin
+        { Gemma 4: <|turn>role\n text <turn|>\n, the assistant is "model".
+          Mirrors the embedded Jinja template without tools and with
+          thinking off (no <|think|> marker -> the model answers directly). }
+        ImStart := PieceId('<|turn>');
+        ImEnd := PieceId('<turn|>');
+        for M in Msgs do
+        begin
+          if SameText(M.Role, 'assistant') then
+            Role := 'model'
+          else if SameText(M.Role, 'developer') then
+            Role := 'system'
+          else
+            Role := LowerCase(M.Role);
+          Res.Add(ImStart);
+          AppendText(Role + #10 + Trim(M.Content));
+          Res.Add(ImEnd);
+          AppendText(#10);
+        end;
+        Res.Add(ImStart);
+        AppendText('model' + #10);
       end;
     ctLlama2:
       begin
@@ -960,6 +1079,188 @@ begin
   SetLength(Result, N);
 end;
 
+{ TGemma4Tokenizer }
+
+constructor TGemma4Tokenizer.Create(Gg: TGgufFile);
+var
+  Merges: TArray<string>;
+  I, B: Integer;
+begin
+  inherited Create(Gg);
+  Merges := Gg.MetaStrArr('tokenizer.ggml.merges');
+  if Length(Merges) = 0 then
+    raise Exception.Create('GGUF: tokenizer.ggml.merges missing (gemma4).');
+  FMergeRank := TDictionary<string, Integer>.Create(Length(Merges));
+  for I := 0 to High(Merges) do
+    FMergeRank.AddOrSetValue(Merges[I], I);
+  for B := 0 to 255 do
+    FByteTok[B] := PieceId(Format('<0x%.2X>', [B]));
+  { llama.cpp forces BOS on for Gemma 4 whatever the metadata says: without
+    it the model produces garbage from the first token on. }
+  FAddBos := FBos >= 0;
+end;
+
+destructor TGemma4Tokenizer.Destroy;
+begin
+  FMergeRank.Free;
+  inherited;
+end;
+
+procedure TGemma4Tokenizer.EncodeWord(const Word: string; Res: TList<Integer>);
+var
+  Syms: TList<string>;
+  Ranks: TList<Integer>;
+  I, BestI, Id, J: Integer;
+  Utf8: TBytes;
+
+  function PairRank(L: Integer): Integer;
+  begin
+    if not FMergeRank.TryGetValue(Syms[L] + ' ' + Syms[L + 1], Result) then
+      Result := MaxInt;
+  end;
+
+begin
+  if Word = '' then
+    Exit;
+  Id := PieceId(Word);
+  if Id >= 0 then
+  begin
+    { Whole word is a token: also what BPE would arrive at, minus the work.
+      For newline runs llama.cpp does exactly this lookup first. }
+    Res.Add(Id);
+    Exit;
+  end;
+  Syms := TList<string>.Create;
+  Ranks := TList<Integer>.Create;
+  try
+    I := 1;
+    while I <= Length(Word) do
+    begin
+      if (I < Length(Word)) and Char.IsSurrogatePair(Word, I) then
+      begin
+        Syms.Add(Copy(Word, I, 2));
+        Inc(I, 2);
+      end
+      else
+      begin
+        Syms.Add(Word[I]);
+        Inc(I);
+      end;
+    end;
+    { Ranks[I] belongs to the pair (Syms[I], Syms[I+1]). Only the two pairs
+      next to a merge change, so a long line costs O(n) per merge instead of
+      a dictionary lookup per pair per merge. }
+    for I := 0 to Syms.Count - 2 do
+      Ranks.Add(PairRank(I));
+    while Syms.Count > 1 do
+    begin
+      BestI := -1;
+      J := MaxInt;
+      for I := 0 to Ranks.Count - 1 do
+        if Ranks[I] < J then
+        begin
+          J := Ranks[I];
+          BestI := I;
+        end;
+      if BestI < 0 then
+        Break;
+      Syms[BestI] := Syms[BestI] + Syms[BestI + 1];
+      Syms.Delete(BestI + 1);
+      Ranks.Delete(BestI);
+      if BestI < Syms.Count - 1 then
+        Ranks[BestI] := PairRank(BestI);
+      if BestI > 0 then
+        Ranks[BestI - 1] := PairRank(BestI - 1);
+    end;
+    for I := 0 to Syms.Count - 1 do
+    begin
+      Id := PieceId(Syms[I]);
+      if Id >= 0 then
+        Res.Add(Id)
+      else
+      begin
+        Utf8 := TEncoding.UTF8.GetBytes(Syms[I]);
+        for J := 0 to High(Utf8) do
+          if FByteTok[Utf8[J]] >= 0 then
+            Res.Add(FByteTok[Utf8[J]]);
+      end;
+    end;
+  finally
+    Syms.Free;
+    Ranks.Free;
+  end;
+end;
+
+function TGemma4Tokenizer.Encode(const Text: string): TArray<Integer>;
+var
+  Res: TList<Integer>;
+  S: string;
+  I, Start: Integer;
+  IsNl: Boolean;
+begin
+  Res := TList<Integer>.Create;
+  try
+    S := StringReplace(Text, ' ', #$2581, [rfReplaceAll]);
+    I := 1;
+    while I <= Length(S) do
+    begin
+      Start := I;
+      IsNl := S[I] = #10;
+      while (I <= Length(S)) and ((S[I] = #10) = IsNl) do
+        Inc(I);
+      EncodeWord(Copy(S, Start, I - Start), Res);
+    end;
+    Result := Res.ToArray;
+  finally
+    Res.Free;
+  end;
+end;
+
+function TGemma4Tokenizer.TokenBytes(Id: Integer): TBytes;
+var
+  P: string;
+  B: Integer;
+begin
+  if (Id < 0) or (Id > High(FPieces)) then
+    Exit(nil);
+  if FTypes[Id] = TT_CONTROL then
+    Exit(nil);
+  P := FPieces[Id];
+  if (Length(P) = 6) and P.StartsWith('<0x') and P.EndsWith('>') then
+  begin
+    B := StrToIntDef('$' + Copy(P, 4, 2), -1);
+    if B >= 0 then
+    begin
+      SetLength(Result, 1);
+      Result[0] := Byte(B);
+      Exit;
+    end;
+  end;
+  P := StringReplace(P, #$2581, ' ', [rfReplaceAll]);
+  Result := TEncoding.UTF8.GetBytes(P);
+end;
+
+{ TGgufBackend }
+
+destructor TGgufBackend.Destroy;
+begin
+  FTok.Free;
+  inherited;
+end;
+
+function TGgufBackend.Tokenizer: TLlmTokenizerBase;
+begin
+  Result := FTok;
+end;
+
+function TGgufBackend.DefaultTemplate: TChatTemplate;
+begin
+  if FTemplate <> ctAuto then
+    Result := FTemplate
+  else
+    Result := FTok.AutoTemplate;
+end;
+
 function CreateGgufTokenizer(Gg: TGgufFile): TGgufTokenizerBase;
 var
   Model: string;
@@ -969,9 +1270,11 @@ begin
     Result := TGpt2Tokenizer.Create(Gg)
   else if SameText(Model, 'llama') then
     Result := TSpmTokenizer.Create(Gg)
+  else if SameText(Model, 'gemma4') then
+    Result := TGemma4Tokenizer.Create(Gg)
   else
     raise Exception.CreateFmt('GGUF: tokenizer model "%s" not supported ' +
-      '(llama/gpt2).', [Model]);
+      '(llama/gpt2/gemma4).', [Model]);
 end;
 
 end.

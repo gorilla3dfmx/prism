@@ -81,7 +81,7 @@ type
   end;
   TChatMessages = TArray<TChatMessage>;
 
-  TChatTemplate = (ctAuto, ctPrism, ctChatML, ctLlama2, ctPlain);
+  TChatTemplate = (ctAuto, ctPrism, ctChatML, ctLlama2, ctPlain, ctGemma);
 
   { Abstract tokenizer: implemented by TTokenizer (custom byte-level BPE),
     TSpmTokenizer and TGpt2Tokenizer (both built from GGUF metadata). }
@@ -97,6 +97,11 @@ type
     { True if raw prompts (completion/generate) should be prefixed with a
       BOS token (GGUF models expect this; the Prism corpus format does not) }
     function PrependBos: Boolean; virtual;
+    { Tokens that open/close a span the user must not see (Gemma 4's
+      <|channel>thought ... <channel|>). The generator still feeds the span
+      through the model, it only keeps it out of the output. }
+    function IsHiddenOpen(Id: Integer): Boolean; virtual;
+    function IsHiddenClose(Id: Integer): Boolean; virtual;
     { Builds the prompt token sequence from chat messages (incl. template) }
     function BuildChatTokens(const Msgs: TChatMessages;
       Template: TChatTemplate): TArray<Integer>; virtual; abstract;
@@ -285,6 +290,16 @@ begin
 end;
 
 function TLlmTokenizerBase.PrependBos: Boolean;
+begin
+  Result := False;
+end;
+
+function TLlmTokenizerBase.IsHiddenOpen(Id: Integer): Boolean;
+begin
+  Result := False;
+end;
+
+function TLlmTokenizerBase.IsHiddenClose(Id: Integer): Boolean;
 begin
   Result := False;
 end;

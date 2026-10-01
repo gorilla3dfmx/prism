@@ -14,7 +14,7 @@ program PrismServer;
     --ctx N             cap the context window (GGUF, saves KV-cache RAM)
     --verify            self-verification enabled by default
     --train             online finetuning via POST /api/train (.prism only)
-    --template T        auto | prism | chatml | llama2 | plain
+    --template T        auto | prism | chatml | llama2 | plain | gemma
     --gpu               enable the GPU backend (Vulkan; OpenCL as fallback)
     --gpu-budget MB     cap the VRAM used for weights (0 = derive from device).
                         Less than the model needs is fine: the tensors that fit
@@ -44,6 +44,8 @@ uses
   Prism.Inference in '..\src\Prism.Inference.pas',
   Prism.Gguf in '..\src\Prism.Gguf.pas',
   Prism.Llama in '..\src\Prism.Llama.pas',
+  Prism.Gemma4 in '..\src\Prism.Gemma4.pas',
+  Prism.GgufModels in '..\src\Prism.GgufModels.pas',
   Prism.Train in '..\src\Prism.Train.pas',
   Prism.Multimodal in '..\src\Prism.Multimodal.pas',
   Prism.Verify in '..\src\Prism.Verify.pas',

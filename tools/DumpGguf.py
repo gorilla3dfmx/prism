@@ -30,7 +30,7 @@ GGML_TYPE = {
     30: 'BF16',
 }
 
-PRISM_SUPPORTED = {'F32', 'F16', 'Q4_0', 'Q4_1', 'Q8_0', 'Q4_K', 'Q5_K', 'Q6_K'}
+PRISM_SUPPORTED = {'F32', 'F16', 'BF16', 'Q4_0', 'Q4_1', 'Q8_0', 'Q4_K', 'Q5_K', 'Q6_K'}
 
 
 class Reader:

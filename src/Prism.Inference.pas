@@ -585,7 +585,7 @@ var
   SB: TStringBuilder;
   Chunk, Accum, Expr, Inj: string;
   ScanPos, A, B, ToolCalls: Integer;
-  ToolsOn: Boolean;
+  ToolsOn, Hidden: Boolean;
   Clock: TStopwatch;
 
   procedure Emit(const S: string);
@@ -628,6 +628,7 @@ begin
     ScanPos := 1;
     ToolCalls := 0;
     ToolsOn := Assigned(ToolHandler);
+    Hidden := False;
     while (N < SP.MaxTokens) and (FEngine.Position < MaxCtx) do
     begin
       Tok := SampleToken(SP);
@@ -636,7 +637,14 @@ begin
       if OutTokens <> nil then
         OutTokens.Add(Tok);
       Inc(N);
-      Piece := FBackend.Tokenizer.TokenBytes(Tok);
+      if FBackend.Tokenizer.IsHiddenOpen(Tok) then
+        Hidden := True;
+      if Hidden then
+        Piece := nil
+      else
+        Piece := FBackend.Tokenizer.TokenBytes(Tok);
+      if FBackend.Tokenizer.IsHiddenClose(Tok) then
+        Hidden := False;
       if Length(Piece) > 0 then
       begin
         Buf := Buf + Piece;

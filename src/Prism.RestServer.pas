@@ -32,7 +32,7 @@ uses
   System.Generics.Collections,
   IdHTTPServer, IdCustomHTTPServer, IdContext, IdGlobal,
   Prism.Types, Prism.Model, Prism.Streaming, Prism.Tokenizer,
-  Prism.Inference, Prism.Llama, Prism.Verify, Prism.Multimodal,
+  Prism.Inference, Prism.Gguf, Prism.GgufModels, Prism.Verify, Prism.Multimodal,
   Prism.Train, Prism.Gpu, Prism.Laws;
 
 type
@@ -218,6 +218,8 @@ begin
     Result := ctLlama2
   else if SameText(S, 'plain') then
     Result := ctPlain
+  else if SameText(S, 'gemma') then
+    Result := ctGemma
   else
     Result := ctAuto;
 end;
@@ -278,14 +280,15 @@ begin
   if Ext = '.gguf' then
   begin
     Log('Loading GGUF model: ' + AOpts.ModelPath);
-    FBackend := TLlamaBackend.Create(AOpts.ModelPath, AOpts.CtxOverride,
+    { The architecture (Llama family, Gemma 4, ...) is read from the file. }
+    FBackend := CreateGgufBackend(AOpts.ModelPath, AOpts.CtxOverride,
       AOpts.StreamLayers, procedure(S: string) begin Log(S); end);
     if FTemplate <> ctAuto then
-      TLlamaBackend(FBackend).Template := FTemplate;
+      TGgufBackend(FBackend).Template := FTemplate;
     Log(Format('GGUF ready: %s (arch %s, vocab %d, context %d)',
-      [FBackend.ModelName, TLlamaBackend(FBackend).Model.Gguf.Arch,
-       TLlamaBackend(FBackend).Model.Cfg.Vocab,
-       TLlamaBackend(FBackend).Model.Cfg.CtxLen]));
+      [FBackend.ModelName, TGgufBackend(FBackend).Arch,
+       TGgufBackend(FBackend).Vocab,
+       TGgufBackend(FBackend).ContextLength]));
   end
   else
   begin
@@ -618,7 +621,7 @@ begin
   DoVerify := GetBool(Body, 'verify', FOpts.VerifyDefault) and not Stream;
   UseTools := GetBool(Body, 'use_tools', False) or
     (Body.GetValue('tools') <> nil);
-  if UseTools and (FBackend is TLlamaBackend) then
+  if UseTools and (FBackend is TGgufBackend) then
   begin
     { GGUF instruct models: prepend a system message that teaches the
       <<calc: ...>> protocol. Native Prism models are expected to have
